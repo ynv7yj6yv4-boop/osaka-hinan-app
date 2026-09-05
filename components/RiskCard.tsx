@@ -14,7 +14,7 @@ export default function RiskCard({
   if (isLoading) {
     return (
       <div className="mx-3 mt-2 rounded-xl border-2 border-zinc-300 bg-white px-4 py-3 text-zinc-600">
-        現在地の危険度を判定しています…
+        現在地の災害リスクを判定しています…
       </div>
     );
   }
@@ -34,7 +34,9 @@ export default function RiskCard({
         {info.emoji}
       </span>
       <span className="flex-1">
-        <span className="block text-xs text-zinc-600">現在の危険度（アプリ独自の参考評価）</span>
+        <span className="block text-xs text-zinc-600">
+          現在地の災害リスク（静的なハザード情報に基づく参考評価）
+        </span>
         <span className="block text-xl font-bold" style={{ color: info.color }}>
           {info.label}
         </span>

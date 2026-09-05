@@ -28,7 +28,7 @@ export default function RiskDetailModal({
               {info.emoji}
             </span>
             <div>
-              <div className="text-xs text-zinc-600">現在の危険度</div>
+              <div className="text-xs text-zinc-600">現在地の災害リスク</div>
               <div className="text-2xl font-bold" style={{ color: info.color }}>
                 {info.label}
               </div>
