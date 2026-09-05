@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import ShelterLayer from "./ShelterLayer";
+import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
 
 // Leafletのデフォルトアイコン画像はNext.js環境だとパス解決に失敗するため、
 // CDN上の画像を明示的に指定して置き換える。
@@ -38,6 +40,7 @@ export default function MapView() {
   const [position, setPosition] = useState<LatLng | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [activeHazard, setActiveHazard] = useState<HazardKey | null>(null);
 
   const handleLocate = () => {
     setErrorMessage(null);
@@ -81,6 +84,40 @@ export default function MapView() {
         </p>
       </header>
 
+      <div
+        role="group"
+        aria-label="ハザード情報の表示切り替え"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 py-2 bg-zinc-100 border-b-2 border-zinc-200"
+      >
+        <button
+          type="button"
+          onClick={() => setActiveHazard(null)}
+          aria-pressed={activeHazard === null}
+          className={`py-3 rounded-lg text-base font-bold border-2 ${
+            activeHazard === null
+              ? "bg-zinc-800 text-white border-zinc-800"
+              : "bg-white text-zinc-700 border-zinc-300"
+          }`}
+        >
+          表示しない
+        </button>
+        {HAZARD_BUTTONS.map((h) => (
+          <button
+            key={h.key}
+            type="button"
+            onClick={() => setActiveHazard(h.key)}
+            aria-pressed={activeHazard === h.key}
+            className={`py-3 rounded-lg text-base font-bold border-2 ${
+              activeHazard === h.key
+                ? "bg-blue-700 text-white border-blue-700"
+                : "bg-white text-zinc-700 border-zinc-300"
+            }`}
+          >
+            {h.emoji} {h.label}
+          </button>
+        ))}
+      </div>
+
       <div className="relative flex-1">
         <MapContainer
           center={OSAKA_CITY_CENTER}
@@ -91,6 +128,18 @@ export default function MapView() {
             attribution='&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
             url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
           />
+
+          {activeHazard && (
+            <TileLayer
+              key={activeHazard}
+              attribution={HAZARD_ATTRIBUTION}
+              url={HAZARD_TILE_URL[activeHazard]}
+              opacity={0.6}
+            />
+          )}
+
+          <ShelterLayer activeHazard={activeHazard} />
+
           {position && (
             <Marker position={[position.lat, position.lng]} icon={defaultIcon}>
               <Popup>現在地（おおよその位置）</Popup>
@@ -108,6 +157,23 @@ export default function MapView() {
         >
           {isLocating ? "取得中..." : "📍 現在地を取得"}
         </button>
+
+        {activeHazard && (
+          <div className="absolute bottom-6 left-4 z-[1000] flex flex-col gap-1 rounded-lg bg-white/95 px-3 py-2 text-xs text-zinc-700 shadow">
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-3 w-3 rounded-full bg-green-600" />
+              選択中の災害でも使える避難場所
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-3 w-3 rounded-full bg-zinc-500" />
+              その他の指定緊急避難場所
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-3 w-3 rounded-full bg-blue-600" />
+              指定避難所
+            </div>
+          </div>
+        )}
       </div>
 
       {errorMessage && (

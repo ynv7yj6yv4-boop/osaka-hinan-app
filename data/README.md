@@ -1,0 +1,35 @@
+# データソース一覧
+
+このアプリで使用している外部データの出典・ライセンスをまとめます。
+
+## 避難所・避難場所データ
+
+- **出典**: 国土地理院 指定緊急避難場所・指定避難所データ（大阪市, 市町村コード27100）
+- **取得元URL**: https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html
+- **取得日**: 2026-09-06
+- **利用規約**: [国土地理院コンテンツ利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html) に加え、`raw/gsi-notice.txt`（ダウンロード時に同梱される「ご利用上の注意」）に従うこと。特に以下の点に注意：
+  - データは最新でない場合がある。最新・詳細は大阪市に確認すること。
+  - 「指定緊急避難場所」と「指定避難所」は別物であり、指定緊急避難場所は災害種別ごとに指定される。
+  - 第三者に提供する場合は、上記の注意事項を正確に伝えること。
+  - → アプリ内の免責表示・データ由来の注記でこれを満たしています。
+- **生データ**: `raw/27100_shitei-kinkyu-hinanbasho.csv`（指定緊急避難場所）, `raw/27100_shitei-hinanjo.csv`（指定避難所）
+- **変換スクリプト**: `../scripts/build-shelters.mjs` → `../public/data/osaka-shelters.json` を生成
+
+## ハザード情報（洪水・内水氾濫・高潮）
+
+- **出典**: 国土交通省 ハザードマップポータルサイト「重ねるハザードマップ」タイル配信
+- **利用規約**: [ハザードマップポータルサイト利用規約](https://disaportal.gsi.go.jp/hazardmap/copyright/copyright.html)（公共データ利用規約PDL1.0準拠。二次利用・商用利用可、出典表記必須、加工した場合はその旨明記）
+- **タイルURL**:
+  - 洪水浸水想定区域: `https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png`
+  - 内水氾濫（大阪府）: `https://disaportaldata.gsi.go.jp/raster/02_naisui_pref_data/27/{z}/{x}/{y}.png`
+  - 高潮浸水想定区域: `https://disaportaldata.gsi.go.jp/raster/03_hightide_l2_shinsuishin_data/{z}/{x}/{y}.png`
+- アプリ内表示は「出典：ハザードマップポータルサイト」と表記しています。
+
+## 背景地図
+
+- **出典**: 国土地理院タイル（標準地図） `https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png`
+- アプリ内表示は「© 国土地理院」と表記しています。
+
+## データ更新について
+
+避難所データは市町村の登録更新に伴い変わるため、`scripts/build-shelters.mjs` を再実行して定期的に更新することを推奨します（次回以降のPhaseで検討）。
