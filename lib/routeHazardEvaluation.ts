@@ -32,8 +32,7 @@
 // 断定できなかった（判断不能）。
 
 import { HAZARD_TILE_URL } from "@/components/hazardLayers";
-import { matchDepthColor } from "./hazardColorLegend";
-import { samplePixelFromTile } from "./tilePixel";
+import { classifyHazardPixel } from "./hazardPixelClassifier";
 import {
   sampleRouteAtInterval as sampleRouteAtIntervalMath,
   aggregateRouteHazardResults,
@@ -50,14 +49,14 @@ export { sampleRouteAtIntervalMath as sampleRouteAtInterval };
 // 呼び出し側から上書き可能にしている（このファイル内の値は「デフォルト」に過ぎない）。
 export const DEFAULT_SAMPLE_INTERVAL_METERS = 30;
 
+// Phase5A.3: Phase3と共通の判定関数(lib/hazardPixelClassifier.ts)を使う。
+// SamplePointResult（routeHazardMath.ts側の集計が期待する形）へのマッピングのみ
+// ここで行い、判定ロジック自体はPhase3と完全に同じものを使用する。
 async function assessFloodAtPoint(point: LatLng): Promise<SamplePointResult> {
-  const result = await samplePixelFromTile(HAZARD_TILE_URL.flood, point.lat, point.lng);
-  if (result.kind === "error") return { status: "unknown", reason: "fetch_error" };
-  if (result.kind === "no_tile") return { status: "unknown", reason: "no_tile" };
-  if (result.a === 0) return { status: "evaluated", rank: 0 };
-  const match = matchDepthColor(result.r, result.g, result.b);
-  if (!match.matched) return { status: "unknown", reason: "unrecognized_color" };
-  return { status: "evaluated", rank: match.rank };
+  const pixel = await classifyHazardPixel(HAZARD_TILE_URL.flood, point.lat, point.lng);
+  if (pixel.status === "hazard") return { status: "evaluated", rank: pixel.rank };
+  if (pixel.status === "outside") return { status: "evaluated", rank: 0 };
+  return { status: "unknown", reason: pixel.reason };
 }
 
 export type RouteHazardEvaluation = {
@@ -70,6 +69,8 @@ export type RouteHazardEvaluation = {
   floodCrossingDistanceMeters: number;
   floodCrossingRatioAmongEvaluatedDistance: number | null;
   unavailableSampleCount: number;
+  /** Phase5A.3: unknownの理由別内訳（研究ログでの追跡用。集計計算には使わない） */
+  unavailableReasonCounts: { no_tile: number; fetch_error: number; color_unknown: number };
   /** 【限界】サンプル地点間に、サンプリングされなかった浸水域が存在する可能性があり、
    *  実際の最大値を見逃す場合がある（詳細はdata/README.md参照）。 */
   maxDepthRank: DepthRank;

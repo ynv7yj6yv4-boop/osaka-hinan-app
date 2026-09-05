@@ -6,9 +6,9 @@ import type { RouteHazardEvaluation } from "./routeHazardEvaluation";
 import type { FloodShelterCandidate } from "./floodShelterCandidates";
 
 // 判定ルールを変更した場合はこの値を更新する。
-// Phase5A.2: 距離計算の不具合修正（道なり距離ベースに統一）・フィールド名の明確化
-// （routingDistanceMeters と hazardEvaluationDistanceMeters を明示的に分離）。
-export const ROUTE_RULE_VERSION = "phase5a2-flood-only-v3";
+// Phase5A.3: Phase3と共通のハザード判定ロジック(lib/hazardPixelClassifier.ts)を使用するよう統一。
+// unknownの理由別内訳を追加。
+export const ROUTE_RULE_VERSION = "phase5a3-flood-only-v4";
 
 export type RouteJudgmentLog = {
   judgedAt: string;
@@ -42,6 +42,8 @@ export type RouteJudgmentLog = {
     crossingRatioAmongEvaluatedDistance: number | null;
     maxDepthRank: number;
     unavailableSampleCount: number;
+    /** unknownの理由別内訳（研究ログでの追跡用） */
+    unavailableReasonCounts: { no_tile: number; fetch_error: number; color_unknown: number };
   };
   ruleVersion: string;
   dataSourcesUsed: string[];
@@ -84,6 +86,7 @@ export function buildRouteJudgmentLog(params: {
       crossingRatioAmongEvaluatedDistance: evaluation.floodCrossingRatioAmongEvaluatedDistance,
       maxDepthRank: evaluation.maxDepthRank,
       unavailableSampleCount: evaluation.unavailableSampleCount,
+      unavailableReasonCounts: evaluation.unavailableReasonCounts,
     },
     ruleVersion: ROUTE_RULE_VERSION,
     dataSourcesUsed: [

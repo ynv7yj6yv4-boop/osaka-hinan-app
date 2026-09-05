@@ -80,7 +80,7 @@ export type DepthRank = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type SamplePointResult =
   | { status: "evaluated"; rank: DepthRank }
-  | { status: "unknown"; reason: "no_tile" | "fetch_error" | "unrecognized_color" };
+  | { status: "unknown"; reason: "no_tile" | "fetch_error" | "color_unknown" };
 
 export type AggregatedHazardResult = {
   hazardEvaluationDistanceMeters: number;
@@ -90,6 +90,9 @@ export type AggregatedHazardResult = {
   floodCrossingDistanceMeters: number;
   floodCrossingRatioAmongEvaluatedDistance: number | null;
   unavailableSampleCount: number;
+  /** Phase5A.3: unknownだったサンプルの理由別内訳（研究ログでの追跡用）。
+   *  この内訳は集計（距離・比率）には一切使わない、記録のみの付加情報。 */
+  unavailableReasonCounts: { no_tile: number; fetch_error: number; color_unknown: number };
   maxDepthRank: DepthRank;
 };
 
@@ -124,8 +127,12 @@ export function aggregateRouteHazardResults(
     maxRank = Math.max(maxRank, segMaxRank) as DepthRank;
   }
 
+  const unavailableReasonCounts = { no_tile: 0, fetch_error: 0, color_unknown: 0 };
   for (const r of results) {
-    if (r.status === "unknown") unavailableCount++;
+    if (r.status === "unknown") {
+      unavailableCount++;
+      unavailableReasonCounts[r.reason]++;
+    }
   }
 
   const hazardEvaluationDistance = samples.length > 0 ? samples[samples.length - 1].cumulativeDistanceMeters : 0;
@@ -138,6 +145,7 @@ export function aggregateRouteHazardResults(
     floodCrossingDistanceMeters: hazardDistance,
     floodCrossingRatioAmongEvaluatedDistance: evaluatedDistance > 0 ? hazardDistance / evaluatedDistance : null,
     unavailableSampleCount: unavailableCount,
+    unavailableReasonCounts,
     maxDepthRank: maxRank,
   };
 }
