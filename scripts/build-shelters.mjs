@@ -14,12 +14,62 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rawDir = path.join(__dirname, "..", "data", "raw");
 const outPath = path.join(__dirname, "..", "public", "data", "osaka-shelters.json");
 
-// 簡易CSVパーサ（このデータはフィールド内にカンマ・改行を含まないため単純split で十分）
+// CSVパーサ（RFC4180準拠：ダブルクォートで囲まれたフィールド内の改行・カンマ・
+// エスケープされたダブルクォート("")に対応する）。
+//
+// 【修正の経緯】以前は単純な split("\n") / split(",") を使っていたが、
+// 大阪市の元データには施設名が長くダブルクォートで囲み、名前の途中で
+// 改行しているレコードが存在する（例：「特別養護老人ホーム「ライフライト」
+// 並びにケアハウス「ライフフェア」」）。単純split ではこの改行で
+// レコードが分断され、後続の列がズレて誤ったハザード対応データに
+// なってしまっていた（詳細はコミット履歴・Phase5設計報告を参照）。
+function parseCsvRows(text) {
+  const src = text.replace(/^﻿/, "");
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (src[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      row.push(field);
+      field = "";
+    } else if (c === "\n" || c === "\r") {
+      if (c === "\r" && src[i + 1] === "\n") i++;
+      row.push(field);
+      field = "";
+      if (!(row.length === 1 && row[0] === "")) rows.push(row);
+      row = [];
+    } else {
+      field += c;
+    }
+  }
+  // 末尾に改行がない場合の最終フィールド・行を回収
+  if (field !== "" || row.length > 0) {
+    row.push(field);
+    if (!(row.length === 1 && row[0] === "")) rows.push(row);
+  }
+  return rows;
+}
+
 function parseCsv(text) {
-  const lines = text.replace(/^﻿/, "").split(/\r\n|\n/).filter((l) => l.length > 0);
-  const header = lines[0].split(",");
-  return lines.slice(1).map((line) => {
-    const cols = line.split(",");
+  const rows = parseCsvRows(text);
+  const header = rows[0];
+  return rows.slice(1).map((cols) => {
     const row = {};
     header.forEach((key, i) => {
       row[key] = cols[i] ?? "";

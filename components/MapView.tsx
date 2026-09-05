@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
 import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
 import RiskCard from "./RiskCard";
 import RiskDetailModal from "./RiskDetailModal";
+import EvacuationPanel from "./EvacuationPanel";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
+import type { WalkingRoute } from "@/lib/evacuationRoute";
+import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 
 // Leafletのデフォルトアイコン画像はNext.js環境だとパス解決に失敗するため、
 // CDN上の画像を明示的に指定して置き換える。
@@ -47,6 +50,12 @@ export default function MapView() {
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [isAssessingRisk, setIsAssessingRisk] = useState(false);
   const [showRiskDetail, setShowRiskDetail] = useState(false);
+  const [showEvacuationPanel, setShowEvacuationPanel] = useState(false);
+  const [evacuationRoutes, setEvacuationRoutes] = useState<{
+    routes: WalkingRoute[];
+    highlightedIndex: number;
+    destination: FloodShelterCandidate;
+  } | null>(null);
 
   const handleLocate = () => {
     setErrorMessage(null);
@@ -100,6 +109,18 @@ export default function MapView() {
         isLoading={isAssessingRisk}
         onOpenDetail={() => setShowRiskDetail(true)}
       />
+
+      {position && (
+        <div className="px-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setShowEvacuationPanel(true)}
+            className="w-full rounded-lg bg-emerald-700 py-3 text-base font-bold text-white active:bg-emerald-800"
+          >
+            🏃 避難先を探す（洪水対応）
+          </button>
+        </div>
+      )}
 
       <div
         role="group"
@@ -162,6 +183,28 @@ export default function MapView() {
               <Popup>現在地（おおよその位置）</Popup>
             </Marker>
           )}
+
+          {evacuationRoutes?.routes.map((r, i) => (
+            <Polyline
+              key={i}
+              positions={r.geometry.map((p) => [p.lat, p.lng])}
+              pathOptions={
+                i === evacuationRoutes.highlightedIndex
+                  ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
+                  : { color: "#9ca3af", weight: 3, opacity: 0.6, dashArray: "6 6" }
+              }
+            />
+          ))}
+
+          {evacuationRoutes && (
+            <Marker
+              position={[evacuationRoutes.destination.lat, evacuationRoutes.destination.lng]}
+              icon={defaultIcon}
+            >
+              <Popup>{evacuationRoutes.destination.name}</Popup>
+            </Marker>
+          )}
+
           <RecenterOnLocate position={position} />
         </MapContainer>
 
@@ -204,6 +247,14 @@ export default function MapView() {
 
       {showRiskDetail && riskResult && (
         <RiskDetailModal result={riskResult} onClose={() => setShowRiskDetail(false)} />
+      )}
+
+      {showEvacuationPanel && position && (
+        <EvacuationPanel
+          position={position}
+          onClose={() => setShowEvacuationPanel(false)}
+          onRoutesChange={setEvacuationRoutes}
+        />
       )}
     </div>
   );

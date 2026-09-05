@@ -51,6 +51,23 @@
 - **色→降水強度の変換根拠**: `lib/rainfallColorLegend.ts` のコメントを参照。国交省ハザードマップの色凡例（Phase3）とは異なり、気象庁の一次資料に明記された値ではなく、複数の状況証拠を組み合わせた推定値です。そのため危険度判定には使用せず、目安表示のみに使用しています。
 - **実装確認日**: 2026-09-06（実際にタイルを取得し、東京都内の地点で降水検出まで動作確認済み）
 
+## 徒歩ルート（Phase5Aで使用）
+
+- **データ提供元**: openrouteservice（HeiGIT, ハイデルベルク大学）
+- **正式エンドポイント**: `https://api.heigit.org/openrouteservice/v2/directions/{profile}/geojson`（2026-09-06時点で疎通確認済み。古い`api.openrouteservice.org`は使用しない）
+- **利用プロファイル**: `foot-walking`（徒歩）
+- **代替ルート**: `alternative_routes`パラメータで最大3件取得（openrouteservice側の上限も3）
+- **APIキー**: 環境変数 `OPENROUTESERVICE_API_KEY` で管理（`.env.local`、Git管理対象外）。**クライアント側コードには一切埋め込まず**、Next.jsのサーバー側API Route（`app/api/evacuation-route/route.ts`）経由でのみ使用する。
+- **利用規約・制限**: 徒歩ルートは距離上限6,000km、経由地点上限50。無料プランの詳細な流量制限は[利用規約ページ](https://openrouteservice.org/restrictions/)を参照。研究・非商用利用は許容されている。
+- **道路データ**: OpenStreetMapベース。大阪市内の歩行者経路の網羅性は未検証（今回のテストで確認できた範囲では正常にルートが取得できている）。
+- **実装確認日**: 2026-09-06（大阪市北区内で実際にルート取得・複数ルート取得・ハザード評価まで動作確認済み）
+
+## 洪水ハザードによるルート評価（Phase5Aで使用）
+
+- Phase3のハザード判定（`lib/hazardColorLegend.ts`, `lib/tilePixel.ts`）をそのまま再利用し、ルート専用のロジックは`lib/routeHazardEvaluation.ts`に分離。
+- サンプリング間隔は既定30mだが、呼び出し側で変更可能（`DEFAULT_SAMPLE_INTERVAL_METERS`）。卒論での20m/50m/100m比較等はこの値を差し替えて検証する想定。
+- 対象は洪水のみ（Phase5A時点）。内水氾濫・高潮はPhase5Bで別途検討。
+
 ## 背景地図
 
 - **出典**: 国土地理院タイル（標準地図） `https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png`
