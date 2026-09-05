@@ -96,29 +96,59 @@ async function assessFloodAtPoint(point: LatLng): Promise<SamplePointResult> {
 export type RouteHazardEvaluation = {
   sampleIntervalMeters: number;
   sampleCount: number;
+  /** サンプリングした区間の合計距離(m)。 evaluatedDistanceMeters + unavailableDistanceMeters に等しい。
+   *  openrouteserviceが報告するルート距離（WalkingRoute.distanceMeters）とは、
+   *  サンプリングによる近似のため厳密には一致しない場合がある。 */
+  routeTotalDistanceMeters: number;
   /** サンプル間の区間のうち、両端が評価できた区間の合計距離(m) */
   evaluatedDistanceMeters: number;
-  /** 評価できた区間のうち、洪水ハザードが検出された区間の合計距離(m) */
-  floodHazardDistanceMeters: number;
-  /** floodHazardDistanceMeters / evaluatedDistanceMeters （evaluatedDistanceMetersが0の場合はnull） */
-  floodHazardRatio: number | null;
-  /** 評価できなかった（通信エラー等）区間の合計距離(m) */
+  /** 評価できなかった（通信エラー等）区間の合計距離(m)。「安全」を意味しない。 */
   unavailableDistanceMeters: number;
+  /** evaluatedDistanceMeters / routeTotalDistanceMeters （routeTotalDistanceMetersが0の場合はnull）
+   *  ＝ルートのうち、どれだけの割合を実際に評価できたか。100%未満の場合、
+   *  この評価結果は「ルート全体」を保証するものではないことを意味する。 */
+  evaluationCoverageRatio: number | null;
+  /** 評価できた区間のうち、洪水ハザードが検出された区間の合計距離(m) */
+  floodCrossingDistanceMeters: number;
+  /** floodCrossingDistanceMeters / evaluatedDistanceMeters
+   *  （evaluatedDistanceMetersが0の場合はnull）。
+   *  【重要】分母は「評価できた区間」であり「ルート総距離」ではない。
+   *  評価カバー率(evaluationCoverageRatio)が低い場合、この割合の信頼性も下がる。 */
+  floodCrossingRatioAmongEvaluatedDistance: number | null;
   unavailableSampleCount: number;
-  /** 検出された中で最大の想定浸水深ランク（0=検出なし） */
+  /** 検出された中で最大の想定浸水深ランク（0=検出なし）。
+   *  【限界】サンプル地点間に、サンプリングされなかった浸水域が存在する可能性があり、
+   *  実際の最大値を見逃す場合がある（詳細はdata/README.md参照）。 */
   maxDepthRank: DepthRank;
+  /** この評価1回の処理時間(ms)。サンプリング間隔ごとの処理コスト比較に使用する。 */
+  processingTimeMs: number;
 };
 
 /**
  * ルートの折れ線をサンプリングし、洪水ハザードを評価する。
+ *
+ * 【区間の近似方法（安全側に働く単純な規則）】
  * サンプル間の区間は「区間の両端のいずれかで洪水ハザードが検出されたら、
- * その区間全体を“ハザードあり”とみなす」という単純な規則で集計する
- * （区間の途中でハザードの有無が切り替わる可能性を考慮した、安全側＝過大評価寄りの近似）。
+ * その区間全体を“ハザードあり”とみなす」という単純な規則で集計している。
+ * これは区間の途中でハザードの有無が切り替わる可能性を考慮した近似であり、
+ * 実際の浸水区域の境界がサンプル区間の中央付近にある場合、
+ * 実際より広め（過大）に「ハザードあり」と評価される傾向がある
+ * （逆に、区間の両端がたまたま浸水域の外側にある場合、区間中央の
+ * 浸水域を見逃す可能性もゼロではない）。
+ * サンプリング間隔を細かくするほどこの近似誤差は小さくなるはずだが、
+ * その処理コストとのトレードオフはPhase5A.1の実験で検証する
+ * （scripts/route-sampling-experiment.mjs の結果を参照）。
+ *
+ * 【重要】未評価区間は「洪水ハザードなし（安全）」として扱わない。
+ * evaluatedDistanceMeters / unavailableDistanceMeters / evaluationCoverageRatio
+ * を必ず分離して保持し、呼び出し側・UI側で「評価できていない」ことを
+ * 明示できるようにしている。
  */
 export async function evaluateRouteFloodHazard(
   geometry: LatLng[],
   intervalMeters: number = DEFAULT_SAMPLE_INTERVAL_METERS
 ): Promise<RouteHazardEvaluation> {
+  const startedAt = Date.now();
   const samplePoints = sampleRouteAtInterval(geometry, intervalMeters);
   const results = await Promise.all(samplePoints.map(assessFloodAtPoint));
 
@@ -150,14 +180,19 @@ export async function evaluateRouteFloodHazard(
     if (r.status === "unavailable") unavailableCount++;
   }
 
+  const routeTotalDistance = evaluatedDistance + unavailableDistance;
+
   return {
     sampleIntervalMeters: intervalMeters,
     sampleCount: samplePoints.length,
+    routeTotalDistanceMeters: routeTotalDistance,
     evaluatedDistanceMeters: evaluatedDistance,
-    floodHazardDistanceMeters: hazardDistance,
-    floodHazardRatio: evaluatedDistance > 0 ? hazardDistance / evaluatedDistance : null,
     unavailableDistanceMeters: unavailableDistance,
+    evaluationCoverageRatio: routeTotalDistance > 0 ? evaluatedDistance / routeTotalDistance : null,
+    floodCrossingDistanceMeters: hazardDistance,
+    floodCrossingRatioAmongEvaluatedDistance: evaluatedDistance > 0 ? hazardDistance / evaluatedDistance : null,
     unavailableSampleCount: unavailableCount,
     maxDepthRank: maxRank,
+    processingTimeMs: Date.now() - startedAt,
   };
 }

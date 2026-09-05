@@ -239,12 +239,19 @@ export default function EvacuationPanel({
                           {formatMeters(r.route.distanceMeters)}・{formatMinutes(r.route.durationSeconds)}
                         </div>
                         <div className="mt-1 text-sm text-zinc-700">
-                          浸水想定区域を通る距離の目安：{formatMeters(r.evaluation.floodHazardDistanceMeters)}（
-                          {formatRatio(r.evaluation.floodHazardRatio)}）
+                          浸水想定区域を通る距離の目安：{formatMeters(r.evaluation.floodCrossingDistanceMeters)}（
+                          {formatRatio(r.evaluation.floodCrossingRatioAmongEvaluatedDistance)}）
                         </div>
                         <div className="mt-1 text-xs text-zinc-500">
                           最大想定浸水深：{DEPTH_RANK_LABELS[r.evaluation.maxDepthRank]}
                         </div>
+                        {r.evaluation.evaluationCoverageRatio !== null &&
+                          r.evaluation.evaluationCoverageRatio < 1 && (
+                            <div className="mt-1 text-xs font-bold text-amber-700">
+                              ⚠ ルートの一部でハザード情報を確認できていません（評価カバー率
+                              {formatRatio(r.evaluation.evaluationCoverageRatio)}）
+                            </div>
+                          )}
                       </button>
                     </li>
                   ))}
@@ -269,19 +276,31 @@ export default function EvacuationPanel({
               <p className="mt-1 text-base text-zinc-800">
                 浸水想定区域を通る推定距離：約{formatMeters(routeLog.floodHazard.crossingDistanceMeters)}
                 <br />
-                割合：{formatRatio(routeLog.floodHazard.crossingRatio)}
+                割合（評価できた区間のうち）：{formatRatio(routeLog.floodHazard.crossingRatioAmongEvaluatedDistance)}
                 <br />
                 最大想定浸水深：{DEPTH_RANK_LABELS[routeLog.floodHazard.maxDepthRank]}
               </p>
-              {routeLog.floodHazard.unavailableSampleCount > 0 && (
-                <p className="mt-1 text-sm text-amber-700">
-                  ※ルート上{routeLog.floodHazard.unavailableSampleCount}
-                  地点で、一部区間のハザード情報を確認できませんでした（評価には含まれていません）。
-                </p>
-              )}
+
+              <div className="mt-3 rounded-lg bg-zinc-50 p-3">
+                <div className="text-sm font-bold text-zinc-800">評価カバー率</div>
+                <div className="mt-1 text-base text-zinc-800">
+                  {formatRatio(routeLog.floodHazard.evaluationCoverageRatio)}
+                  （評価済み 約{formatMeters(routeLog.floodHazard.evaluatedDistanceMeters)} / 総距離 約
+                  {formatMeters(routeLog.floodHazard.routeTotalDistanceMeters)}）
+                </div>
+                {routeLog.floodHazard.unavailableDistanceMeters > 0 && (
+                  <div className="mt-1 text-sm font-bold text-amber-700">
+                    ⚠ ルートの一部でハザード情報を確認できていません（未評価：約
+                    {formatMeters(routeLog.floodHazard.unavailableDistanceMeters)}、
+                    {routeLog.floodHazard.unavailableSampleCount}地点）。この区間は「安全」を意味するものではありません。
+                  </div>
+                )}
+              </div>
+
               <p className="mt-2 text-xs text-zinc-500">
                 約{routeLog.sampling.intervalMeters}mごと・{routeLog.sampling.sampleCount}
-                地点のサンプリングによる推定値です。実際の浸水区域の境界と厳密には一致しない場合があります。
+                地点のサンプリングによる推定値です（処理時間：約{routeLog.sampling.processingTimeMs}ms）。
+                実際の浸水区域の境界と厳密には一致しない場合があります。サンプル地点の間に狭い浸水域がある場合、見逃す可能性があります。
               </p>
             </section>
             <section className="rounded-lg bg-zinc-50 p-3">

@@ -1,4 +1,4 @@
-// Phase 5A: 避難ルート判定ログ（卒業研究としての再現性のための記録構造）
+// Phase 5A / 5A.1: 避難ルート判定ログ（卒業研究としての再現性のための記録構造）
 // Phase4Aの JudgmentLog と対になるもの。永続保存はまだ行わない。
 
 import type { LatLng } from "./routeHazardEvaluation";
@@ -6,8 +6,8 @@ import type { RouteHazardEvaluation } from "./routeHazardEvaluation";
 import type { FloodShelterCandidate } from "./floodShelterCandidates";
 
 // 判定ルールを変更した場合はこの値を更新する。
-// "flood-only"は対象災害が洪水のみであることを表す。
-export const ROUTE_RULE_VERSION = "phase5a-flood-only-v1";
+// Phase5A.1で評価カバー率・処理時間等のフィールドを追加したためバージョンを更新した。
+export const ROUTE_RULE_VERSION = "phase5a1-flood-only-v2";
 
 export type RouteJudgmentLog = {
   judgedAt: string;
@@ -23,13 +23,17 @@ export type RouteJudgmentLog = {
   sampling: {
     intervalMeters: number;
     sampleCount: number;
+    processingTimeMs: number;
   };
   floodHazard: {
+    routeTotalDistanceMeters: number;
+    evaluatedDistanceMeters: number;
+    unavailableDistanceMeters: number;
+    evaluationCoverageRatio: number | null;
     crossingDistanceMeters: number;
-    crossingRatio: number | null;
+    crossingRatioAmongEvaluatedDistance: number | null;
     maxDepthRank: number;
     unavailableSampleCount: number;
-    unavailableDistanceMeters: number;
   };
   ruleVersion: string;
   dataSourcesUsed: string[];
@@ -61,13 +65,17 @@ export function buildRouteJudgmentLog(params: {
     sampling: {
       intervalMeters: evaluation.sampleIntervalMeters,
       sampleCount: evaluation.sampleCount,
+      processingTimeMs: evaluation.processingTimeMs,
     },
     floodHazard: {
-      crossingDistanceMeters: evaluation.floodHazardDistanceMeters,
-      crossingRatio: evaluation.floodHazardRatio,
+      routeTotalDistanceMeters: evaluation.routeTotalDistanceMeters,
+      evaluatedDistanceMeters: evaluation.evaluatedDistanceMeters,
+      unavailableDistanceMeters: evaluation.unavailableDistanceMeters,
+      evaluationCoverageRatio: evaluation.evaluationCoverageRatio,
+      crossingDistanceMeters: evaluation.floodCrossingDistanceMeters,
+      crossingRatioAmongEvaluatedDistance: evaluation.floodCrossingRatioAmongEvaluatedDistance,
       maxDepthRank: evaluation.maxDepthRank,
       unavailableSampleCount: evaluation.unavailableSampleCount,
-      unavailableDistanceMeters: evaluation.unavailableDistanceMeters,
     },
     ruleVersion: ROUTE_RULE_VERSION,
     dataSourcesUsed: [
