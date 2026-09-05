@@ -14,6 +14,8 @@ import { HAZARD_BUTTONS, HAZARD_TILE_URL, type HazardKey } from "@/components/ha
 import { matchDepthColor, type DepthRank } from "./hazardColorLegend";
 import { samplePixelFromTile } from "./tilePixel";
 import { fetchElevation } from "./elevation";
+import { fetchRainfallObservation, type RainfallObservationResult } from "./rainfallObservation";
+import { buildJudgmentLog, type JudgmentLog } from "./judgmentLog";
 
 export type RiskLevel = "unknown" | "safe" | "caution" | "prepare" | "evacuate";
 
@@ -53,6 +55,11 @@ export type RiskResult = {
   disclaimers: string[];
   position: { lat: number; lng: number };
   generatedAt: string;
+  // Phase4A: 現在の降雨実況（参考情報）。
+  // 重要: staticRisk（上記level/score/factors/reasons）は降雨の影響を受けない。
+  // 「静的には高リスクだが今は降っていない」等を区別できるよう、常に別枠で保持する。
+  rainfall: RainfallObservationResult;
+  judgmentLog: JudgmentLog;
 };
 
 const HAZARD_LABELS: Record<HazardKey, string> = Object.fromEntries(
@@ -117,9 +124,12 @@ const RECOMMENDATION_TEXT: Record<RiskLevel, string> = {
 export async function assessRisk(lat: number, lng: number): Promise<RiskResult> {
   const hazardKeys: HazardKey[] = ["flood", "inundation", "hightide"];
 
-  const [hazardResults, elevation] = await Promise.all([
+  // 静的ハザード判定・標高・降雨実況は互いに独立しているため並行取得する。
+  // 降雨の取得に失敗しても、静的ハザード判定（Phase3の評価）には一切影響しない。
+  const [hazardResults, elevation, rainfall] = await Promise.all([
     Promise.all(hazardKeys.map((key) => assessHazard(key, lat, lng))),
     fetchElevation(lat, lng),
+    fetchRainfallObservation(lat, lng),
   ]);
 
   const factors: RiskFactor[] = [];
@@ -166,21 +176,35 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
     });
   }
 
-  // 将来Phaseで追加する判定要素の置き場所（今は「利用不可」として明示するのみ）
+  // Phase4A: 現在の降雨実況は「取得・表示」のみ行い、危険度スコアには含めない
+  // （色→mm/hの対応関係が状況証拠の組み合わせによる推定であり、
+  //   スコアへ組み込むだけの確度がないと判断したため。lib/rainfallColorLegend.ts参照）
   factors.push({
     key: "rainfall",
-    label: "リアルタイム降雨",
-    available: false,
-    detail: "リアルタイム降雨：今後のPhaseで対応予定のため、今回の判定には含まれていません",
+    label: "現在の降雨",
+    available: rainfall.status === "observed",
+    detail:
+      rainfall.status === "observed"
+        ? `現在の降雨（${rainfall.dataTimeLabel}時点、気象庁レーダーによる目安）：${rainfall.approxRange}※このリスク評価には反映していません`
+        : "現在の降雨データを取得できないため、降雨状況は判定に反映していません",
     score: 0,
   });
 
   const disclaimers = [
     "これはハザードマップ等の静的な情報に基づくアプリ独自の参考評価であり、公式の避難情報ではありません。",
-    "大雨や高潮が実際に発生した場合を想定したハザードマップに基づく評価です。現在の降雨状況は考慮されていません。",
+    "大雨や高潮が実際に発生した場合を想定したハザードマップに基づく評価です。現在の降雨状況（表示している場合も含む）は、この危険度の判定には反映していません。",
   ];
 
   const level: RiskLevel = anyDetermined ? scoreToLevel(maxRank) : "unknown";
+
+  const judgmentLog = buildJudgmentLog({
+    position: { lat, lng },
+    staticFactors: factors,
+    staticScore: maxRank,
+    rainfall,
+    level,
+    reasons,
+  });
 
   return {
     level,
@@ -191,5 +215,7 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
     disclaimers,
     position: { lat, lng },
     generatedAt: new Date().toISOString(),
+    rainfall,
+    judgmentLog,
   };
 }

@@ -44,8 +44,27 @@ export default function RiskDetailModal({
           </button>
         </div>
 
+        <section className="mt-4 rounded-lg border-2 border-sky-200 bg-sky-50 p-3">
+          <h2 className="text-base font-bold text-zinc-900">現在の降雨（参考情報）</h2>
+          {result.rainfall.status === "observed" ? (
+            <>
+              <p className="mt-1 text-base text-zinc-800">{result.rainfall.approxRange}</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                気象庁レーダーによる {result.rainfall.dataTimeLabel} 時点のデータ（目安）
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-zinc-600">
+              現在の降雨データを取得できないため、降雨状況は判定に反映していません。
+            </p>
+          )}
+          <p className="mt-2 text-xs font-bold text-sky-800">
+            ※この降雨情報は、下記の「現在地の災害リスク」の判定にはまだ反映されていません（今後のPhaseで対応予定）。
+          </p>
+        </section>
+
         <section className="mt-4">
-          <h2 className="text-base font-bold text-zinc-900">判定理由</h2>
+          <h2 className="text-base font-bold text-zinc-900">判定理由（静的なハザード情報）</h2>
           <ul className="mt-2 space-y-1 text-base text-zinc-800">
             {result.reasons.map((reason, i) => (
               <li key={i}>・{reason}</li>
