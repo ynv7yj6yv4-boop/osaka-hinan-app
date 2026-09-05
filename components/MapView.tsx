@@ -6,6 +6,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
 import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
+import RiskCard from "./RiskCard";
+import RiskDetailModal from "./RiskDetailModal";
+import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
 
 // Leafletのデフォルトアイコン画像はNext.js環境だとパス解決に失敗するため、
 // CDN上の画像を明示的に指定して置き換える。
@@ -41,6 +44,9 @@ export default function MapView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [activeHazard, setActiveHazard] = useState<HazardKey | null>(null);
+  const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
+  const [isAssessingRisk, setIsAssessingRisk] = useState(false);
+  const [showRiskDetail, setShowRiskDetail] = useState(false);
 
   const handleLocate = () => {
     setErrorMessage(null);
@@ -53,11 +59,16 @@ export default function MapView() {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (result) => {
-        setPosition({
-          lat: result.coords.latitude,
-          lng: result.coords.longitude,
-        });
+        const lat = result.coords.latitude;
+        const lng = result.coords.longitude;
+        setPosition({ lat, lng });
         setIsLocating(false);
+
+        // 現在地が取得できたら、続けてその場所の危険度を自動判定する
+        setIsAssessingRisk(true);
+        assessRisk(lat, lng)
+          .then(setRiskResult)
+          .finally(() => setIsAssessingRisk(false));
       },
       (error) => {
         setIsLocating(false);
@@ -83,6 +94,12 @@ export default function MapView() {
           これは参考情報です。公式の避難情報は必ず自治体の発表をご確認ください。
         </p>
       </header>
+
+      <RiskCard
+        result={riskResult}
+        isLoading={isAssessingRisk}
+        onOpenDetail={() => setShowRiskDetail(true)}
+      />
 
       <div
         role="group"
@@ -183,6 +200,10 @@ export default function MapView() {
         >
           {errorMessage}
         </div>
+      )}
+
+      {showRiskDetail && riskResult && (
+        <RiskDetailModal result={riskResult} onClose={() => setShowRiskDetail(false)} />
       )}
     </div>
   );

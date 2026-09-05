@@ -25,6 +25,18 @@
   - 高潮浸水想定区域: `https://disaportaldata.gsi.go.jp/raster/03_hightide_l2_shinsuishin_data/{z}/{x}/{y}.png`
 - アプリ内表示は「出典：ハザードマップポータルサイト」と表記しています。
 
+## 標高データ（現在地の危険度判定・Phase3で使用）
+
+- **出典**: 国土地理院 標高API
+- **URL**: `https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lat={緯度}&lon={経度}&outtype=JSON`
+- **利用規約**: [国土地理院コンテンツ利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html)（出典表記必須）
+- **注意点**: 無料・APIキー不要だが、1秒に1回程度のアクセス制限あり（過度な連続アクセス禁止）。海上等データが無い地点は `elevation` が文字列 `"-----"` で返る。
+
+## ハザードマップの浸水深カラー凡例（Phase3で使用）
+
+- **出典**: 国土交通省の資料に記載された標準凡例。2026-09-06に実際のタイル画像からピクセル色を抽出し、一致することを確認済み。
+- 実装: `../lib/hazardColorLegend.ts`
+
 ## 背景地図
 
 - **出典**: 国土地理院タイル（標準地図） `https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png`
