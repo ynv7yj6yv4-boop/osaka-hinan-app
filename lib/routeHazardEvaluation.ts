@@ -1,198 +1,108 @@
-// Phase 5A: 徒歩ルート上の洪水ハザード評価
+// Phase 5A / 5A.1 / 5A.2: 徒歩ルート上の洪水ハザード評価
 //
 // Phase3の低レベル処理（タイル取得・ピクセル読み取り・色の凡例）はそのまま再利用するが、
 // 「ルートを評価する」というPhase5A固有のロジックはこのファイルに分離している。
 // lib/riskAssessment.ts（現在地単体の判定）には手を加えない。
 //
-// 【方針】
-// - 対象は洪水のみ（Phase5B以降で内水氾濫・高潮に拡張する余地を残す）
-// - サンプリング間隔は固定値に決め打ちせず、呼び出し側から指定できるようにする
-// - サンプリングに失敗した区間は「危険ではない」とは扱わず、
-//   「評価できなかった区間」として別枠で集計する
+// 数値計算部分（サンプリング・集計）は lib/routeHazardMath.ts に分離し、
+// ネットワークに依存しない単体テスト（lib/routeHazardMath.test.ts）を追加した。
+// このファイルはタイル取得（I/O）とそれらの計算の呼び出しのみを担当する。
+//
+// 【Phase5A.2での修正（重要）】
+// Phase5A.1では、サンプル点どうしの距離を直線（Haversine）で再計算していたため、
+// 道が曲がる区間で実際の経路距離より短く算出される不具合があった
+// （間隔が粗いほど誤差が拡大し、ORSの報告距離との乖離も大きくなっていた）。
+// 詳細な原因調査・実データでの検証記録は data/README.md を参照。
+//
+// 【距離フィールドの基準】
+// - hazardEvaluationDistanceMeters: このハザード評価が対象とした、道なりの総距離。
+//   openrouteserviceが報告する距離（呼び出し側で別途 routingDistanceMeters として保持）
+//   とは独立に、ルートのgeometry（頂点列）から道なりに計算しているため、
+//   丸め・頂点間隔の違いにより、ごくわずかな差異が生じる場合がある。
+// - evaluatedDistanceMeters + unavailableDistanceMeters = hazardEvaluationDistanceMeters
+// - evaluationCoverageRatio = evaluatedDistanceMeters / hazardEvaluationDistanceMeters
+// - floodCrossingRatioAmongEvaluatedDistance = floodCrossingDistanceMeters / evaluatedDistanceMeters
+//   （分母は「評価できた区間」のみ。ルート総距離ではない）
+//
+// 【404の意味について（data/README.mdに詳細記録）】
+// タイルが存在する(200)場合、透明ピクセル(alpha=0)は「確認できた区域外」として
+// evaluated 扱いにする。一方404（タイル自体が存在しない）は、区域外の確定判定
+// ではなく「このタイルデータだけでは判定できない」状態として "unknown" に分類する。
+// 404が具体的に「区域外」「データ未整備」のどちらを意味するかは、公式資料からは
+// 断定できなかった（判断不能）。
 
 import { HAZARD_TILE_URL } from "@/components/hazardLayers";
-import { matchDepthColor, type DepthRank } from "./hazardColorLegend";
+import { matchDepthColor } from "./hazardColorLegend";
 import { samplePixelFromTile } from "./tilePixel";
+import {
+  sampleRouteAtInterval as sampleRouteAtIntervalMath,
+  aggregateRouteHazardResults,
+  type LatLng,
+  type SamplePointResult,
+  type DepthRank,
+  type RouteSample,
+} from "./routeHazardMath";
 
-export type LatLng = { lat: number; lng: number };
+export type { LatLng, RouteSample, SamplePointResult, DepthRank };
+export { sampleRouteAtIntervalMath as sampleRouteAtInterval };
 
 // デフォルトのサンプリング間隔（m）。卒論の検証で20m/50m/100m等に変更して比較する想定のため、
 // 呼び出し側から上書き可能にしている（このファイル内の値は「デフォルト」に過ぎない）。
 export const DEFAULT_SAMPLE_INTERVAL_METERS = 30;
 
-function haversineDistanceMeters(a: LatLng, b: LatLng): number {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-function interpolate(a: LatLng, b: LatLng, t: number): LatLng {
-  return { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t };
-}
-
-/**
- * 折れ線（ルートの頂点列）を、指定した間隔（m）でサンプリングした地点の配列にする。
- * 始点・終点は必ず含む。
- */
-export function sampleRouteAtInterval(
-  geometry: LatLng[],
-  intervalMeters: number = DEFAULT_SAMPLE_INTERVAL_METERS
-): LatLng[] {
-  if (geometry.length === 0) return [];
-  if (geometry.length === 1) return [geometry[0]];
-
-  const points: LatLng[] = [geometry[0]];
-  let distanceSinceLastSample = 0;
-
-  for (let i = 0; i < geometry.length - 1; i++) {
-    const segStart = geometry[i];
-    const segEnd = geometry[i + 1];
-    const segLength = haversineDistanceMeters(segStart, segEnd);
-    if (segLength === 0) continue;
-
-    let coveredInSeg = 0;
-    while (distanceSinceLastSample + (segLength - coveredInSeg) >= intervalMeters) {
-      const remaining = intervalMeters - distanceSinceLastSample;
-      coveredInSeg += remaining;
-      const t = coveredInSeg / segLength;
-      points.push(interpolate(segStart, segEnd, Math.min(1, t)));
-      distanceSinceLastSample = 0;
-    }
-    distanceSinceLastSample += segLength - coveredInSeg;
-  }
-
-  const last = geometry[geometry.length - 1];
-  const lastSampled = points[points.length - 1];
-  if (haversineDistanceMeters(lastSampled, last) > 1) {
-    points.push(last);
-  }
-  return points;
-}
-
-export type SamplePointResult =
-  | { status: "evaluated"; rank: DepthRank }
-  | { status: "unavailable" };
-
 async function assessFloodAtPoint(point: LatLng): Promise<SamplePointResult> {
   const result = await samplePixelFromTile(HAZARD_TILE_URL.flood, point.lat, point.lng);
-  if (result.kind === "error" || result.kind === "no_tile") {
-    return { status: "unavailable" };
-  }
-  if (result.a === 0) {
-    return { status: "evaluated", rank: 0 };
-  }
+  if (result.kind === "error") return { status: "unknown", reason: "fetch_error" };
+  if (result.kind === "no_tile") return { status: "unknown", reason: "no_tile" };
+  if (result.a === 0) return { status: "evaluated", rank: 0 };
   const match = matchDepthColor(result.r, result.g, result.b);
-  if (!match.matched) {
-    return { status: "unavailable" };
-  }
+  if (!match.matched) return { status: "unknown", reason: "unrecognized_color" };
   return { status: "evaluated", rank: match.rank };
 }
 
 export type RouteHazardEvaluation = {
   sampleIntervalMeters: number;
   sampleCount: number;
-  /** サンプリングした区間の合計距離(m)。 evaluatedDistanceMeters + unavailableDistanceMeters に等しい。
-   *  openrouteserviceが報告するルート距離（WalkingRoute.distanceMeters）とは、
-   *  サンプリングによる近似のため厳密には一致しない場合がある。 */
-  routeTotalDistanceMeters: number;
-  /** サンプル間の区間のうち、両端が評価できた区間の合計距離(m) */
+  hazardEvaluationDistanceMeters: number;
   evaluatedDistanceMeters: number;
-  /** 評価できなかった（通信エラー等）区間の合計距離(m)。「安全」を意味しない。 */
   unavailableDistanceMeters: number;
-  /** evaluatedDistanceMeters / routeTotalDistanceMeters （routeTotalDistanceMetersが0の場合はnull）
-   *  ＝ルートのうち、どれだけの割合を実際に評価できたか。100%未満の場合、
-   *  この評価結果は「ルート全体」を保証するものではないことを意味する。 */
   evaluationCoverageRatio: number | null;
-  /** 評価できた区間のうち、洪水ハザードが検出された区間の合計距離(m) */
   floodCrossingDistanceMeters: number;
-  /** floodCrossingDistanceMeters / evaluatedDistanceMeters
-   *  （evaluatedDistanceMetersが0の場合はnull）。
-   *  【重要】分母は「評価できた区間」であり「ルート総距離」ではない。
-   *  評価カバー率(evaluationCoverageRatio)が低い場合、この割合の信頼性も下がる。 */
   floodCrossingRatioAmongEvaluatedDistance: number | null;
   unavailableSampleCount: number;
-  /** 検出された中で最大の想定浸水深ランク（0=検出なし）。
-   *  【限界】サンプル地点間に、サンプリングされなかった浸水域が存在する可能性があり、
+  /** 【限界】サンプル地点間に、サンプリングされなかった浸水域が存在する可能性があり、
    *  実際の最大値を見逃す場合がある（詳細はdata/README.md参照）。 */
   maxDepthRank: DepthRank;
-  /** この評価1回の処理時間(ms)。サンプリング間隔ごとの処理コスト比較に使用する。 */
+  /** 参考値。ネットワーク条件（キャッシュ有無等）に左右されるため、
+   *  厳密なアルゴリズム比較には使えない（data/README.md参照）。 */
   processingTimeMs: number;
 };
 
 /**
  * ルートの折れ線をサンプリングし、洪水ハザードを評価する。
  *
- * 【区間の近似方法（安全側に働く単純な規則）】
+ * 【区間の近似方法】
  * サンプル間の区間は「区間の両端のいずれかで洪水ハザードが検出されたら、
  * その区間全体を“ハザードあり”とみなす」という単純な規則で集計している。
- * これは区間の途中でハザードの有無が切り替わる可能性を考慮した近似であり、
- * 実際の浸水区域の境界がサンプル区間の中央付近にある場合、
- * 実際より広め（過大）に「ハザードあり」と評価される傾向がある
- * （逆に、区間の両端がたまたま浸水域の外側にある場合、区間中央の
- * 浸水域を見逃す可能性もゼロではない）。
- * サンプリング間隔を細かくするほどこの近似誤差は小さくなるはずだが、
- * その処理コストとのトレードオフはPhase5A.1の実験で検証する
- * （scripts/route-sampling-experiment.mjs の結果を参照）。
+ * Phase5A.1の実験では、この近似によりサンプリング間隔が粗いほど
+ * 洪水区域通過距離が増加する傾向が確認された。ただし「20mが真値に最も近い」
+ * という結論はまだ出せていない（data/README.md参照）。
  *
  * 【重要】未評価区間は「洪水ハザードなし（安全）」として扱わない。
- * evaluatedDistanceMeters / unavailableDistanceMeters / evaluationCoverageRatio
- * を必ず分離して保持し、呼び出し側・UI側で「評価できていない」ことを
- * 明示できるようにしている。
  */
 export async function evaluateRouteFloodHazard(
   geometry: LatLng[],
   intervalMeters: number = DEFAULT_SAMPLE_INTERVAL_METERS
 ): Promise<RouteHazardEvaluation> {
   const startedAt = Date.now();
-  const samplePoints = sampleRouteAtInterval(geometry, intervalMeters);
-  const results = await Promise.all(samplePoints.map(assessFloodAtPoint));
-
-  let evaluatedDistance = 0;
-  let hazardDistance = 0;
-  let unavailableDistance = 0;
-  let unavailableCount = 0;
-  let maxRank: DepthRank = 0;
-
-  for (let i = 0; i < samplePoints.length - 1; i++) {
-    const segLength = haversineDistanceMeters(samplePoints[i], samplePoints[i + 1]);
-    const a = results[i];
-    const b = results[i + 1];
-
-    if (a.status === "unavailable" || b.status === "unavailable") {
-      unavailableDistance += segLength;
-      continue;
-    }
-
-    evaluatedDistance += segLength;
-    const segMaxRank = Math.max(a.rank, b.rank) as DepthRank;
-    if (segMaxRank > 0) {
-      hazardDistance += segLength;
-    }
-    maxRank = Math.max(maxRank, segMaxRank) as DepthRank;
-  }
-
-  for (const r of results) {
-    if (r.status === "unavailable") unavailableCount++;
-  }
-
-  const routeTotalDistance = evaluatedDistance + unavailableDistance;
+  const samples = sampleRouteAtIntervalMath(geometry, intervalMeters);
+  const results = await Promise.all(samples.map((s) => assessFloodAtPoint(s.point)));
+  const aggregated = aggregateRouteHazardResults(samples, results);
 
   return {
     sampleIntervalMeters: intervalMeters,
-    sampleCount: samplePoints.length,
-    routeTotalDistanceMeters: routeTotalDistance,
-    evaluatedDistanceMeters: evaluatedDistance,
-    unavailableDistanceMeters: unavailableDistance,
-    evaluationCoverageRatio: routeTotalDistance > 0 ? evaluatedDistance / routeTotalDistance : null,
-    floodCrossingDistanceMeters: hazardDistance,
-    floodCrossingRatioAmongEvaluatedDistance: evaluatedDistance > 0 ? hazardDistance / evaluatedDistance : null,
-    unavailableSampleCount: unavailableCount,
-    maxDepthRank: maxRank,
+    sampleCount: samples.length,
     processingTimeMs: Date.now() - startedAt,
+    ...aggregated,
   };
 }

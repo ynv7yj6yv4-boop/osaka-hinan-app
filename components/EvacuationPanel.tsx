@@ -148,7 +148,7 @@ export default function EvacuationPanel({
           origin: position,
           destination,
           provider: "openrouteservice",
-          distanceMeters: r.route.distanceMeters,
+          routingDistanceMeters: r.route.distanceMeters,
           durationSeconds: r.route.durationSeconds,
           geometryPointCount: r.route.geometry.length,
           evaluation: r.evaluation,
@@ -266,7 +266,7 @@ export default function EvacuationPanel({
             <section>
               <h3 className="text-sm font-bold text-zinc-900">【ルート情報】</h3>
               <p className="mt-1 text-base text-zinc-800">
-                距離：約{formatMeters(routeLog.route.distanceMeters)}
+                距離：約{formatMeters(routeLog.route.routingDistanceMeters)}
                 <br />
                 推定徒歩時間：{formatMinutes(routeLog.route.durationSeconds)}
               </p>
@@ -285,8 +285,12 @@ export default function EvacuationPanel({
                 <div className="text-sm font-bold text-zinc-800">評価カバー率</div>
                 <div className="mt-1 text-base text-zinc-800">
                   {formatRatio(routeLog.floodHazard.evaluationCoverageRatio)}
-                  （評価済み 約{formatMeters(routeLog.floodHazard.evaluatedDistanceMeters)} / 総距離 約
-                  {formatMeters(routeLog.floodHazard.routeTotalDistanceMeters)}）
+                  （評価済み 約{formatMeters(routeLog.floodHazard.evaluatedDistanceMeters)} / ハザード評価対象距離 約
+                  {formatMeters(routeLog.floodHazard.hazardEvaluationDistanceMeters)}）
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  ※ハザード評価対象距離は、ルート距離（約
+                  {formatMeters(routeLog.route.routingDistanceMeters)}）とは別に、経路の形状から独自に算出した道なり距離です。ごくわずかな差が生じる場合があります。
                 </div>
                 {routeLog.floodHazard.unavailableDistanceMeters > 0 && (
                   <div className="mt-1 text-sm font-bold text-amber-700">
