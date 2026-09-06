@@ -36,6 +36,17 @@ function formatRatio(r: number | null): string {
   return `約${(r * 100).toFixed(1)}%`;
 }
 
+// Coverageが0%（＝この区間について何も判定できていない）の場合、
+// 「洪水区域0%」のように安全側の数値として見えないよう、専用の文言にする。
+function floodCrossingSummaryText(evaluation: RouteHazardEvaluation): string {
+  if (evaluation.evaluatedDistanceMeters === 0) {
+    return "洪水ハザード評価：判定できません（ハザード情報を確認できた区間がありませんでした）";
+  }
+  return `浸水想定区域を通る距離の目安：${formatMeters(evaluation.floodCrossingDistanceMeters)}（${formatRatio(
+    evaluation.floodCrossingRatioAmongEvaluatedDistance
+  )}）`;
+}
+
 const DEPTH_RANK_LABELS: Record<number, string> = {
   0: "検出なし",
   1: "0.5m未満",
@@ -64,9 +75,14 @@ export default function EvacuationPanel({
   const [candidatesLoading, setCandidatesLoading] = useState(true);
 
   const [destination, setDestination] = useState<FloodShelterCandidate | null>(null);
-  const [routesLoading, setRoutesLoading] = useState(false);
+  // ルート取得とハザード評価は別工程のため、ユーザーに「今なにをしているか」が
+  // 伝わるよう、ローディング状態を分けて管理する。
+  const [routingLoading, setRoutingLoading] = useState(false);
+  const [hazardEvalLoading, setHazardEvalLoading] = useState(false);
   const [routesError, setRoutesError] = useState<string | null>(null);
   const [routeResults, setRouteResults] = useState<RouteWithEvaluation[] | null>(null);
+  // 同じ避難先への重複リクエストを防ぐ（連打・再選択時の二重取得を避ける）
+  const [requestedDestinationId, setRequestedDestinationId] = useState<string | null>(null);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [routeLog, setRouteLog] = useState<RouteJudgmentLog | null>(null);
@@ -103,9 +119,15 @@ export default function EvacuationPanel({
   }, [routeResults, selectedIndex]);
 
   const handleSelectCandidate = async (candidate: FloodShelterCandidate) => {
+    // 同じ避難先へのリクエストが既に進行中/完了済みなら、ビューだけ切り替えて再取得しない
+    if (requestedDestinationId === candidate.id && (routingLoading || hazardEvalLoading || routeResults)) {
+      setView("routes");
+      return;
+    }
+    setRequestedDestinationId(candidate.id);
     setDestination(candidate);
     setView("routes");
-    setRoutesLoading(true);
+    setRoutingLoading(true);
     setRoutesError(null);
     setRouteResults(null);
 
@@ -113,13 +135,14 @@ export default function EvacuationPanel({
       lat: candidate.lat,
       lng: candidate.lng,
     });
+    setRoutingLoading(false);
 
     if (fetchResult.status === "error") {
-      setRoutesLoading(false);
       setRoutesError(fetchResult.message);
       return;
     }
 
+    setHazardEvalLoading(true);
     const withEval = await Promise.all(
       fetchResult.routes.map(async (route) => ({
         route,
@@ -129,7 +152,7 @@ export default function EvacuationPanel({
 
     setRouteResults(withEval);
     setSelectedIndex(0);
-    setRoutesLoading(false);
+    setHazardEvalLoading(false);
   };
 
   const handleClose = () => {
@@ -169,17 +192,29 @@ export default function EvacuationPanel({
         className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 sm:max-w-md sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-zinc-900">
-            {view === "candidates" && "近くの洪水対応避難先"}
-            {view === "routes" && "参考避難ルート"}
-            {view === "routeDetail" && `${ROUTE_LABELS[selectedIndex]}について`}
-          </h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {view !== "candidates" && (
+              <button
+                type="button"
+                onClick={() => setView(view === "routeDetail" ? "routes" : "candidates")}
+                aria-label="前の画面に戻る"
+                className="shrink-0 rounded-full border-2 border-zinc-300 px-3 py-1 text-lg font-bold text-zinc-600"
+              >
+                ←
+              </button>
+            )}
+            <h2 className="truncate text-lg font-bold text-zinc-900">
+              {view === "candidates" && "近くの洪水対応避難先"}
+              {view === "routes" && "参考避難ルート"}
+              {view === "routeDetail" && `${ROUTE_LABELS[selectedIndex]}について`}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={handleClose}
             aria-label="閉じる"
-            className="rounded-full border-2 border-zinc-300 px-3 py-1 text-lg font-bold text-zinc-600"
+            className="shrink-0 rounded-full border-2 border-zinc-300 px-3 py-1 text-lg font-bold text-zinc-600"
           >
             ×
           </button>
@@ -208,6 +243,7 @@ export default function EvacuationPanel({
                     </div>
                     <div className="mt-1 text-sm text-blue-700">大阪市の洪水対応指定あり</div>
                     <div className="mt-1 text-xs text-zinc-500">{c.address}</div>
+                    <div className="mt-2 text-sm font-bold text-emerald-700">この避難先までのルートを見る →</div>
                   </button>
                 </li>
               ))}
@@ -217,7 +253,10 @@ export default function EvacuationPanel({
 
         {view === "routes" && (
           <div className="mt-3">
-            {routesLoading && <p className="text-zinc-600">徒歩経路を取得しています…</p>}
+            {routingLoading && <p className="text-zinc-600">徒歩ルートを確認しています…</p>}
+            {hazardEvalLoading && (
+              <p className="text-zinc-600">ルートの洪水ハザード情報を確認しています…</p>
+            )}
             {routesError && (
               <p className="mt-2 rounded-lg bg-red-50 p-3 text-sm text-red-800">{routesError}</p>
             )}
@@ -238,14 +277,14 @@ export default function EvacuationPanel({
                         <div className="mt-1 text-sm text-zinc-700">
                           {formatMeters(r.route.distanceMeters)}・{formatMinutes(r.route.durationSeconds)}
                         </div>
-                        <div className="mt-1 text-sm text-zinc-700">
-                          浸水想定区域を通る距離の目安：{formatMeters(r.evaluation.floodCrossingDistanceMeters)}（
-                          {formatRatio(r.evaluation.floodCrossingRatioAmongEvaluatedDistance)}）
-                        </div>
-                        <div className="mt-1 text-xs text-zinc-500">
-                          最大想定浸水深：{DEPTH_RANK_LABELS[r.evaluation.maxDepthRank]}
-                        </div>
+                        <div className="mt-1 text-sm text-zinc-700">{floodCrossingSummaryText(r.evaluation)}</div>
+                        {r.evaluation.evaluatedDistanceMeters > 0 && (
+                          <div className="mt-1 text-xs text-zinc-500">
+                            最大想定浸水深：{DEPTH_RANK_LABELS[r.evaluation.maxDepthRank]}
+                          </div>
+                        )}
                         {r.evaluation.evaluationCoverageRatio !== null &&
+                          r.evaluation.evaluationCoverageRatio > 0 &&
                           r.evaluation.evaluationCoverageRatio < 1 && (
                             <div className="mt-1 text-xs font-bold text-amber-700">
                               ⚠ ルートの一部でハザード情報を確認できていません（評価カバー率
@@ -273,13 +312,19 @@ export default function EvacuationPanel({
             </section>
             <section>
               <h3 className="text-sm font-bold text-zinc-900">【洪水ハザード評価（推定）】</h3>
-              <p className="mt-1 text-base text-zinc-800">
-                浸水想定区域を通る推定距離：約{formatMeters(routeLog.floodHazard.crossingDistanceMeters)}
-                <br />
-                割合（評価できた区間のうち）：{formatRatio(routeLog.floodHazard.crossingRatioAmongEvaluatedDistance)}
-                <br />
-                最大想定浸水深：{DEPTH_RANK_LABELS[routeLog.floodHazard.maxDepthRank]}
-              </p>
+              {routeLog.floodHazard.evaluatedDistanceMeters === 0 ? (
+                <p className="mt-1 text-base font-bold text-zinc-700">
+                  判定できません（このルートはハザード情報を確認できた区間がありませんでした）
+                </p>
+              ) : (
+                <p className="mt-1 text-base text-zinc-800">
+                  浸水想定区域を通る推定距離：約{formatMeters(routeLog.floodHazard.crossingDistanceMeters)}
+                  <br />
+                  割合（評価できた区間のうち）：{formatRatio(routeLog.floodHazard.crossingRatioAmongEvaluatedDistance)}
+                  <br />
+                  最大想定浸水深：{DEPTH_RANK_LABELS[routeLog.floodHazard.maxDepthRank]}
+                </p>
+              )}
 
               <div className="mt-3 rounded-lg bg-zinc-50 p-3">
                 <div className="text-sm font-bold text-zinc-800">評価カバー率</div>

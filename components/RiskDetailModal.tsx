@@ -2,6 +2,22 @@
 
 import { RISK_LEVEL_INFO, type RiskResult } from "@/lib/riskAssessment";
 
+// 内部の英語表現(complete/partial/unavailable)を、一般ユーザー向けの日本語に変換する。
+const COMPLETENESS_TEXT: Record<RiskResult["assessmentCompleteness"], { label: string; detail: string }> = {
+  complete: {
+    label: "すべて確認できました",
+    detail: "洪水・内水氾濫・高潮のすべてについて、ハザード情報を確認できました。",
+  },
+  partial: {
+    label: "一部確認できていません",
+    detail: "洪水・内水氾濫・高潮の一部について、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。",
+  },
+  unavailable: {
+    label: "確認できませんでした",
+    detail: "洪水・内水氾濫・高潮のいずれについても、ハザード情報を確認できませんでした。",
+  },
+};
+
 export default function RiskDetailModal({
   result,
   onClose,
@@ -70,6 +86,16 @@ export default function RiskDetailModal({
               <li key={i}>・{reason}</li>
             ))}
           </ul>
+        </section>
+
+        <section className="mt-4">
+          <h2 className="text-base font-bold text-zinc-900">判定状況</h2>
+          <p className="mt-1 text-base text-zinc-800">
+            {COMPLETENESS_TEXT[result.assessmentCompleteness].label}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {COMPLETENESS_TEXT[result.assessmentCompleteness].detail}
+          </p>
         </section>
 
         <section className="mt-4 rounded-lg bg-zinc-50 p-3">

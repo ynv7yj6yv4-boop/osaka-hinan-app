@@ -2,6 +2,22 @@
 
 このアプリで使用している外部データの出典・ライセンスをまとめます。
 
+## Phase6（大阪市版MVP統合）について
+
+Phase6では新しい判定ロジックの追加は行わず、Phase3〜5A.3で作成した機能を
+一連のユーザーフロー（現在地取得→災害リスク確認→理由確認→避難先探索→
+ルート比較→地図確認）として統合し、UI/UXを整理した。
+
+- 新規: `components/IntroPanel.tsx`（現在地取得前の案内）、`lib/osakaAreaCheck.ts`
+  （大阪市を十分に囲む緩い矩形での簡易チェック。行政区域の推測判定は行わない）
+- 変更: `components/MapView.tsx`（画面全体の統合・エラー分岐・大阪市域外案内）、
+  `components/RiskCard.tsx`（partial時のバッジ追加）、
+  `components/RiskDetailModal.tsx`（判定状況セクション追加）、
+  `components/EvacuationPanel.tsx`（ローディング分離・戻る導線・Coverage0%表現の修正）
+- Phase3の静的ハザード判定、Phase4Aの降雨取得、Phase5Aのルート評価
+  （距離計算・サンプリング・openrouteservice呼び出し・RouteJudgmentLogの数式）は
+  一切変更していない（回帰テスト`npm test`で確認）。
+
 ## 避難所・避難場所データ
 
 - **出典**: 国土地理院 指定緊急避難場所・指定避難所データ（大阪市, 市町村コード27100）

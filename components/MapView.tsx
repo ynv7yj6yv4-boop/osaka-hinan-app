@@ -9,7 +9,9 @@ import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } f
 import RiskCard from "./RiskCard";
 import RiskDetailModal from "./RiskDetailModal";
 import EvacuationPanel from "./EvacuationPanel";
+import IntroPanel from "./IntroPanel";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
+import { isLikelyOutsideOsakaArea } from "@/lib/osakaAreaCheck";
 import type { WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 
@@ -56,12 +58,18 @@ export default function MapView() {
     highlightedIndex: number;
     destination: FloodShelterCandidate;
   } | null>(null);
+  const [outsideAreaNotice, setOutsideAreaNotice] = useState(false);
 
   const handleLocate = () => {
+    // 二重実行防止（取得中は連打しても再実行しない）
+    if (isLocating) return;
+
     setErrorMessage(null);
 
     if (!("geolocation" in navigator)) {
-      setErrorMessage("この端末・ブラウザでは現在地の取得に対応していません。");
+      setErrorMessage(
+        "この端末・ブラウザでは現在地の取得に対応していません。地図上のハザード表示は目視でご確認いただけます。"
+      );
       return;
     }
 
@@ -72,6 +80,7 @@ export default function MapView() {
         const lng = result.coords.longitude;
         setPosition({ lat, lng });
         setIsLocating(false);
+        setOutsideAreaNotice(isLikelyOutsideOsakaArea(lat, lng));
 
         // 現在地が取得できたら、続けてその場所の危険度を自動判定する
         setIsAssessingRisk(true);
@@ -81,17 +90,45 @@ export default function MapView() {
       },
       (error) => {
         setIsLocating(false);
-        if (error.code === error.PERMISSION_DENIED) {
-          setErrorMessage(
-            "位置情報の利用が許可されていません。ブラウザの設定から位置情報を許可してください。"
-          );
-        } else {
-          setErrorMessage("現在地を取得できませんでした。電波状況の良い場所で再度お試しください。");
+        // ブラウザのGeolocation APIが返すエラーコードを区別し、
+        // 技術的なエラーコードではなく次に何をすべきかが分かる文言にする。
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setErrorMessage(
+              "位置情報の利用が許可されていません。ブラウザの設定から位置情報の利用を許可し、再度お試しください。"
+            );
+            break;
+          case error.TIMEOUT:
+            setErrorMessage(
+              "現在地の取得に時間がかかりすぎました。電波状況の良い場所で再度お試しください。"
+            );
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setErrorMessage(
+              "現在地を特定できませんでした。屋外や窓際など、電波状況の良い場所で再度お試しください。"
+            );
+            break;
+          default:
+            setErrorMessage("現在地を取得できませんでした。しばらくしてから再度お試しください。");
         }
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
+
+  // 洪水以外(内水氾濫・高潮)のみでリスクが出ている場合、参考避難ルート機能が
+  // その原因ハザードに対応していないことを案内するためのフラグ。
+  // Phase5Aの洪水専用ルート評価ロジックそのものは変更していない。
+  const floodFactor = riskResult?.factors.find((f) => f.key === "flood");
+  const otherHazardScore = riskResult
+    ? Math.max(
+        riskResult.factors.find((f) => f.key === "inundation")?.score ?? 0,
+        riskResult.factors.find((f) => f.key === "hightide")?.score ?? 0
+      )
+    : 0;
+  const floodIsNotThePrimaryHazard = Boolean(
+    riskResult && otherHazardScore > 0 && (floodFactor?.score ?? 0) === 0
+  );
 
   return (
     <div className="flex flex-col h-dvh w-full">
@@ -103,6 +140,14 @@ export default function MapView() {
           これは参考情報です。公式の避難情報は必ず自治体の発表をご確認ください。
         </p>
       </header>
+
+      {!position && <IntroPanel isLocating={isLocating} onLocate={handleLocate} />}
+
+      {position && outsideAreaNotice && (
+        <div className="mx-3 mt-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          現在地は大阪市エリアから離れている可能性があります。本アプリは大阪市を対象としており、表示される情報が実際と異なる場合があります。
+        </div>
+      )}
 
       <RiskCard
         result={riskResult}
@@ -119,6 +164,11 @@ export default function MapView() {
           >
             🏃 避難先を探す（洪水対応）
           </button>
+          {floodIsNotThePrimaryHazard && (
+            <p className="mt-1 text-xs text-zinc-600">
+              ※現在、参考避難ルートの評価は洪水のみに対応しています（高潮・内水氾濫は今後対応予定）。
+            </p>
+          )}
         </div>
       )}
 
@@ -213,9 +263,9 @@ export default function MapView() {
           onClick={handleLocate}
           disabled={isLocating}
           className="absolute bottom-6 right-4 z-[1000] flex items-center gap-2 rounded-full bg-blue-700 px-6 py-4 text-lg font-bold text-white shadow-lg active:bg-blue-800 disabled:opacity-60"
-          aria-label="現在地を取得する"
+          aria-label={position ? "現在地を再取得する" : "現在地を取得する"}
         >
-          {isLocating ? "取得中..." : "📍 現在地を取得"}
+          {isLocating ? "確認しています…" : position ? "📍 現在地を再取得" : "📍 現在地を取得"}
         </button>
 
         {activeHazard && (

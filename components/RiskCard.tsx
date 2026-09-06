@@ -40,6 +40,11 @@ export default function RiskCard({
         <span className="block text-xl font-bold" style={{ color: info.color }}>
           {info.label}
         </span>
+        {result.assessmentCompleteness === "partial" && (
+          <span className="mt-0.5 block text-xs font-bold text-amber-700">
+            ⚠ 一部のハザード情報を確認できていません
+          </span>
+        )}
       </span>
       <span className="text-sm font-bold text-zinc-500 underline shrink-0">理由を見る</span>
     </button>
