@@ -11,7 +11,7 @@ import RiskDetailModal from "./RiskDetailModal";
 import EvacuationPanel from "./EvacuationPanel";
 import IntroPanel from "./IntroPanel";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
-import { isLikelyOutsideOsakaArea } from "@/lib/osakaAreaCheck";
+import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck";
 import type { WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 
@@ -58,7 +58,10 @@ export default function MapView() {
     highlightedIndex: number;
     destination: FloodShelterCandidate;
   } | null>(null);
-  const [outsideAreaNotice, setOutsideAreaNotice] = useState(false);
+  // Phase6.1: 「矩形内＝大阪市内」を意味しない。矩形内(likely_osaka_or_nearby)は
+  // 大阪市かどうか確認できていない状態、矩形外(clearly_outside)は明らかに
+  // 離れている可能性が高い状態。それぞれ別の案内を表示する。
+  const [areaCheck, setAreaCheck] = useState<OsakaAreaCheckResult | null>(null);
 
   const handleLocate = () => {
     // 二重実行防止（取得中は連打しても再実行しない）
@@ -80,7 +83,7 @@ export default function MapView() {
         const lng = result.coords.longitude;
         setPosition({ lat, lng });
         setIsLocating(false);
-        setOutsideAreaNotice(isLikelyOutsideOsakaArea(lat, lng));
+        setAreaCheck(checkOsakaArea(lat, lng));
 
         // 現在地が取得できたら、続けてその場所の危険度を自動判定する
         setIsAssessingRisk(true);
@@ -143,9 +146,17 @@ export default function MapView() {
 
       {!position && <IntroPanel isLocating={isLocating} onLocate={handleLocate} />}
 
-      {position && outsideAreaNotice && (
+      {position && areaCheck === "clearly_outside" && (
         <div className="mx-3 mt-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          現在地は大阪市エリアから離れている可能性があります。本アプリは大阪市を対象としており、表示される情報が実際と異なる場合があります。
+          現在地は大阪市エリアから明らかに離れている可能性があります。本アプリは大阪市を対象としており、表示される情報は実際と異なります。
+        </div>
+      )}
+
+      {/* Phase6.1: 矩形内であっても「大阪市内である」ことは確認できていないため、
+          常に対象地域を明示する（隣接自治体の地点でも表示される）。 */}
+      {position && areaCheck === "likely_osaka_or_nearby" && (
+        <div className="mx-3 mt-2 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          現在のMVPは大阪市を対象としています。大阪市外の場合、表示される情報が正しくない可能性があります。
         </div>
       )}
 
@@ -157,18 +168,26 @@ export default function MapView() {
 
       {position && (
         <div className="px-3 pt-2">
+          {/* Phase6.1: 現在の主なリスクが洪水以外(高潮・内水氾濫)の場合、
+              この機能が「現在のリスクへの対応」であるかのように見えないよう、
+              ボタンを押す前に注意書きを先に表示し、ボタン自体の見た目も
+              控えめにする（洪水対応機能そのものは非表示にしない）。 */}
+          {floodIsNotThePrimaryHazard && (
+            <p className="mb-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+              ⚠ 現在の危険度は主に高潮・内水氾濫によるものです。下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setShowEvacuationPanel(true)}
-            className="w-full rounded-lg bg-emerald-700 py-3 text-base font-bold text-white active:bg-emerald-800"
+            className={
+              floodIsNotThePrimaryHazard
+                ? "w-full rounded-lg border-2 border-zinc-400 bg-white py-3 text-base font-bold text-zinc-700 active:bg-zinc-50"
+                : "w-full rounded-lg bg-emerald-700 py-3 text-base font-bold text-white active:bg-emerald-800"
+            }
           >
-            🏃 避難先を探す（洪水対応）
+            🏃 洪水時の避難先候補を見る
           </button>
-          {floodIsNotThePrimaryHazard && (
-            <p className="mt-1 text-xs text-zinc-600">
-              ※現在、参考避難ルートの評価は洪水のみに対応しています（高潮・内水氾濫は今後対応予定）。
-            </p>
-          )}
         </div>
       )}
 

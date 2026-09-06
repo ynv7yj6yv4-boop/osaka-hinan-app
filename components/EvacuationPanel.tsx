@@ -206,7 +206,7 @@ export default function EvacuationPanel({
             )}
             <h2 className="truncate text-lg font-bold text-zinc-900">
               {view === "candidates" && "近くの洪水対応避難先"}
-              {view === "routes" && "参考避難ルート"}
+              {view === "routes" && "洪水の参考避難ルート"}
               {view === "routeDetail" && `${ROUTE_LABELS[selectedIndex]}について`}
             </h2>
           </div>
