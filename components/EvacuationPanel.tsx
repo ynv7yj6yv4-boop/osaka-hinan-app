@@ -60,6 +60,7 @@ export default function EvacuationPanel({
   position,
   onClose,
   onRoutesChange,
+  onStartNavigation,
 }: {
   position: LatLng;
   onClose: () => void;
@@ -67,6 +68,8 @@ export default function EvacuationPanel({
   onRoutesChange: (
     data: { routes: WalkingRoute[]; highlightedIndex: number; destination: FloodShelterCandidate } | null
   ) => void;
+  /** 試作3 PART A-1: 選択中のルートでナビを開始する（MapView側で画面を切り替える）。 */
+  onStartNavigation: (route: WalkingRoute, destination: FloodShelterCandidate) => void;
 }) {
   const [view, setView] = useState<View>("candidates");
 
@@ -367,6 +370,18 @@ export default function EvacuationPanel({
                 ※これは「参考避難ルート」であり、「安全なルート」であることを保証するものではありません。冠水・通行止め・倒木・工事・火災・混雑など、実際の道路状況はリアルタイムに反映されていません。現地の状況を優先してください。
               </p>
             </section>
+            {/* 試作3 PART A-1: 選択したルートのgeometryをそのまま使ってナビを
+                開始する（ここで別ルートへ再計算することはしない）。 */}
+            <button
+              type="button"
+              onClick={() => {
+                const r = routeResults?.[selectedIndex];
+                if (r && destination) onStartNavigation(r.route, destination);
+              }}
+              className="w-full rounded-lg bg-blue-700 py-3 text-base font-bold text-white active:bg-blue-800"
+            >
+              🧭 このルートで案内を開始
+            </button>
             <button
               type="button"
               onClick={() => setView("routes")}

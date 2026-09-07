@@ -10,10 +10,13 @@ import RiskCard from "./RiskCard";
 import RiskDetailModal from "./RiskDetailModal";
 import EvacuationPanel from "./EvacuationPanel";
 import IntroPanel from "./IntroPanel";
+import NavTracker from "./NavTracker";
+import NavigationOverlay from "./NavigationOverlay";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
 import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck";
-import type { WalkingRoute } from "@/lib/evacuationRoute";
+import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
+import type { NavigationDisplayState } from "@/lib/navigation";
 
 // Leafletのデフォルトアイコン画像はNext.js環境だとパス解決に失敗するため、
 // CDN上の画像を明示的に指定して置き換える。
@@ -100,6 +103,67 @@ export default function MapView() {
   // 大阪市かどうか確認できていない状態、矩形外(clearly_outside)は明らかに
   // 離れている可能性が高い状態。それぞれ別の案内を表示する。
   const [areaCheck, setAreaCheck] = useState<OsakaAreaCheckResult | null>(null);
+
+  // 試作3 PART A: 選択した参考避難ルートでのナビゲーション。
+  // navigationSessionがnullでない間は「ナビ中」とみなし、通常のRiskCard・
+  // ハザード切替等を隠してNavigationOverlayに切り替える（要件I-10）。
+  const [navigationSession, setNavigationSession] = useState<{
+    route: WalkingRoute;
+    destination: FloodShelterCandidate;
+  } | null>(null);
+  const [navState, setNavState] = useState<NavigationDisplayState | null>(null);
+  const [isRecalculatingRoute, setIsRecalculatingRoute] = useState(false);
+  const [recalculateError, setRecalculateError] = useState<string | null>(null);
+
+  const handleStartNavigation = (route: WalkingRoute, destination: FloodShelterCandidate) => {
+    setNavigationSession({ route, destination });
+    setNavState(null);
+    setRecalculateError(null);
+    setShowEvacuationPanel(false);
+    setShowRiskDetail(false);
+  };
+
+  const handleEndNavigation = () => {
+    // A-1: 取得済みのルート表示自体は消さない（EvacuationPanelを閉じた後も
+    // ルートを地図上で確認できる、という既存の挙動に合わせる）。
+    setNavigationSession(null);
+    setNavState(null);
+  };
+
+  // A-7: 自動での再ルーティングは行わない。ユーザー操作で明示的に
+  // 現在地からルートを再取得するのみ（別ルートへの自動切り替えは将来拡張）。
+  const handleRecalculateRoute = async () => {
+    if (!navigationSession) return;
+    const currentPos = navState?.position ?? position;
+    if (!currentPos) return;
+
+    setIsRecalculatingRoute(true);
+    setRecalculateError(null);
+    const result = await fetchWalkingRoutes(currentPos, {
+      lat: navigationSession.destination.lat,
+      lng: navigationSession.destination.lng,
+    });
+    setIsRecalculatingRoute(false);
+
+    if (result.status === "error") {
+      setRecalculateError(result.message);
+      return;
+    }
+    const newRoute = result.routes[0];
+    if (!newRoute) {
+      setRecalculateError("現在、徒歩経路を取得できません");
+      return;
+    }
+
+    setNavigationSession({ route: newRoute, destination: navigationSession.destination });
+    setNavState(null);
+    // 地図上のルート表示も、実際にナビしているルートに合わせて更新する
+    setEvacuationRoutes({
+      routes: [newRoute],
+      highlightedIndex: 0,
+      destination: navigationSession.destination,
+    });
+  };
 
   const handleLocate = () => {
     // 二重実行防止（取得中は連打しても再実行しない）
@@ -197,7 +261,9 @@ export default function MapView() {
 
         <ShelterLayer activeHazard={activeHazard} />
 
-        {position && (
+        {/* ナビ中はNavTrackerが専用の追跡マーカーを描画するため、
+            一発取得の現在地マーカーとの重複表示を避ける。 */}
+        {position && !navigationSession && (
           <Marker position={[position.lat, position.lng]} icon={defaultIcon}>
             <Popup>現在地（おおよその位置）</Popup>
           </Marker>
@@ -226,8 +292,33 @@ export default function MapView() {
 
         <RecenterOnLocate position={position} />
         <MapResizeHandler />
+
+        {/* 試作3 PART A-3〜A-6: ナビ中のGPS追跡・逸脱判定・到着判定。
+            A-1: navigationSession.route.geometryはナビ開始時に選択したまま
+            固定で使用し、ここで別ルートへ再計算することはしない。 */}
+        {navigationSession && (
+          <NavTracker
+            route={navigationSession.route}
+            destination={navigationSession.destination}
+            onUpdate={setNavState}
+          />
+        )}
       </MapContainer>
 
+      {/* 試作3 PART A-4・I-10: ナビ中は通常のRiskCard・ハザード切替・洪水CTA等を
+          隠し、NavigationOverlay（次の案内・残り距離・終了ボタン）に切り替える。
+          地図そのもの・判定ロジックはどちらの状態でも変更しない。 */}
+      {navigationSession ? (
+        <NavigationOverlay
+          state={navState}
+          destinationName={navigationSession.destination.name}
+          onEnd={handleEndNavigation}
+          onRecalculate={handleRecalculateRoute}
+          isRecalculating={isRecalculatingRoute}
+          recalculateError={recalculateError}
+        />
+      ) : (
+        <>
       {/* ==== 前面レイヤー：地図の上に重ねる情報 ====
           親には pointer-events-none を指定し、地図のドラッグ・ピンチ操作を
           遮らないようにする。実際に操作可能な各カード側で pointer-events-auto を
@@ -395,7 +486,8 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* 現在地取得ボタン（右下固定）。縦向きは下グループのpr-20で右側を空けているため重ならない */}
+      {/* 現在地取得ボタン（右下固定）。縦向きは下グループのpr-20で右側を空けているため重ならない。
+          ナビ中はNavTrackerが継続的に現在地を追跡するため非表示にする。 */}
       <button
         type="button"
         onClick={handleLocate}
@@ -425,6 +517,8 @@ export default function MapView() {
           </div>
         </div>
       )}
+        </>
+      )}
 
       {showRiskDetail && riskResult && (
         <RiskDetailModal result={riskResult} onClose={() => setShowRiskDetail(false)} />
@@ -435,6 +529,7 @@ export default function MapView() {
           position={position}
           onClose={() => setShowEvacuationPanel(false)}
           onRoutesChange={setEvacuationRoutes}
+          onStartNavigation={handleStartNavigation}
         />
       )}
     </div>
