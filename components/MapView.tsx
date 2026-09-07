@@ -49,6 +49,10 @@ export default function MapView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [activeHazard, setActiveHazard] = useState<HazardKey | null>(null);
+  // 試作2: 地図をより中心にしたスマートフォンUIへの改善（要件定義書2 §31 問題①）。
+  // ハザード切替は「常時表示」ではなく「必要なときだけ開く」折りたたみUIにし、
+  // 常時表示は RiskCard・洪水避難CTA・地図に絞る（判定ロジック自体は変更しない）。
+  const [hazardPanelOpen, setHazardPanelOpen] = useState(false);
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [isAssessingRisk, setIsAssessingRisk] = useState(false);
   const [showRiskDetail, setShowRiskDetail] = useState(false);
@@ -147,16 +151,17 @@ export default function MapView() {
       {!position && <IntroPanel isLocating={isLocating} onLocate={handleLocate} />}
 
       {position && areaCheck === "clearly_outside" && (
-        <div className="mx-3 mt-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="mx-3 mt-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-900">
           現在地は大阪市エリアから明らかに離れている可能性があります。本アプリは大阪市を対象としており、表示される情報は実際と異なります。
         </div>
       )}
 
       {/* Phase6.1: 矩形内であっても「大阪市内である」ことは確認できていないため、
-          常に対象地域を明示する（隣接自治体の地点でも表示される）。 */}
+          常に対象地域を明示する（隣接自治体の地点でも表示される）。
+          試作2: 地図優先レイアウトのため1行に収まる分量にコンパクト化（文言・判定は変更なし）。 */}
       {position && areaCheck === "likely_osaka_or_nearby" && (
-        <div className="mx-3 mt-2 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          現在のMVPは大阪市を対象としています。大阪市外の場合、表示される情報が正しくない可能性があります。
+        <div className="mx-3 mt-2 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1 text-xs text-zinc-600">
+          現在のMVPは大阪市が対象です（市外では情報が不正確な場合があります）
         </div>
       )}
 
@@ -191,38 +196,62 @@ export default function MapView() {
         </div>
       )}
 
-      <div
-        role="group"
-        aria-label="ハザード情報の表示切り替え"
-        className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 py-2 bg-zinc-100 border-b-2 border-zinc-200"
-      >
+      {/* 試作2: 常時2行分の高さを占めていたハザード切替を折りたたみ式にし、
+          既定では閉じておく（地図優先。切替の判定ロジック・選択肢は変更なし）。 */}
+      <div className="bg-zinc-100 border-b-2 border-zinc-200">
         <button
           type="button"
-          onClick={() => setActiveHazard(null)}
-          aria-pressed={activeHazard === null}
-          className={`py-3 rounded-lg text-base font-bold border-2 ${
-            activeHazard === null
-              ? "bg-zinc-800 text-white border-zinc-800"
-              : "bg-white text-zinc-700 border-zinc-300"
-          }`}
+          onClick={() => setHazardPanelOpen((v) => !v)}
+          aria-expanded={hazardPanelOpen}
+          aria-controls="hazard-toggle-panel"
+          className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-bold text-zinc-700"
         >
-          表示しない
+          <span>
+            🗺️ ハザード表示：
+            {activeHazard
+              ? `${HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.emoji ?? ""} ${
+                  HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
+                }`
+              : "表示しない"}
+          </span>
+          <span aria-hidden>{hazardPanelOpen ? "▲ 閉じる" : "▼ 切り替える"}</span>
         </button>
-        {HAZARD_BUTTONS.map((h) => (
-          <button
-            key={h.key}
-            type="button"
-            onClick={() => setActiveHazard(h.key)}
-            aria-pressed={activeHazard === h.key}
-            className={`py-3 rounded-lg text-base font-bold border-2 ${
-              activeHazard === h.key
-                ? "bg-blue-700 text-white border-blue-700"
-                : "bg-white text-zinc-700 border-zinc-300"
-            }`}
+        {hazardPanelOpen && (
+          <div
+            id="hazard-toggle-panel"
+            role="group"
+            aria-label="ハザード情報の表示切り替え"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 pb-2.5"
           >
-            {h.emoji} {h.label}
-          </button>
-        ))}
+            <button
+              type="button"
+              onClick={() => setActiveHazard(null)}
+              aria-pressed={activeHazard === null}
+              className={`py-3 rounded-lg text-base font-bold border-2 ${
+                activeHazard === null
+                  ? "bg-zinc-800 text-white border-zinc-800"
+                  : "bg-white text-zinc-700 border-zinc-300"
+              }`}
+            >
+              表示しない
+            </button>
+            {HAZARD_BUTTONS.map((h) => (
+              <button
+                key={h.key}
+                type="button"
+                onClick={() => setActiveHazard(h.key)}
+                aria-pressed={activeHazard === h.key}
+                className={`py-3 rounded-lg text-base font-bold border-2 ${
+                  activeHazard === h.key
+                    ? "bg-blue-700 text-white border-blue-700"
+                    : "bg-white text-zinc-700 border-zinc-300"
+                }`}
+              >
+                {h.emoji} {h.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="relative flex-1">
