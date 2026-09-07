@@ -3,18 +3,20 @@
 import { RISK_LEVEL_INFO, type RiskResult } from "@/lib/riskAssessment";
 
 // 内部の英語表現(complete/partial/unavailable)を、一般ユーザー向けの日本語に変換する。
+// 試作2: 高潮を研究対象から除外したため、対象ハザードは洪水・内水氾濫の2つ
+// （lib/riskAssessment.ts の hazardKeys と対応させる）。
 const COMPLETENESS_TEXT: Record<RiskResult["assessmentCompleteness"], { label: string; detail: string }> = {
   complete: {
     label: "すべて確認できました",
-    detail: "洪水・内水氾濫・高潮のすべてについて、ハザード情報を確認できました。",
+    detail: "洪水・内水氾濫のすべてについて、ハザード情報を確認できました。",
   },
   partial: {
     label: "一部確認できていません",
-    detail: "洪水・内水氾濫・高潮の一部について、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。",
+    detail: "洪水・内水氾濫の一部について、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。",
   },
   unavailable: {
     label: "確認できませんでした",
-    detail: "洪水・内水氾濫・高潮のいずれについても、ハザード情報を確認できませんでした。",
+    detail: "洪水・内水氾濫のいずれについても、ハザード情報を確認できませんでした。",
   },
 };
 

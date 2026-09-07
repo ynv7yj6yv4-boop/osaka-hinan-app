@@ -1,7 +1,10 @@
 // Phase 3: 現在地の災害リスク判定（ルールベース）
 //
 // 設計方針（ユーザーとの合意事項）:
-// - 洪水・内水氾濫・高潮のハザードタイル画像の色を読み取り、浸水深ランクを判定する
+// - 洪水・内水氾濫のハザードタイル画像の色を読み取り、浸水深ランクを判定する
+//   （試作2以降、高潮は研究対象から除外したためRiskLevel算出には使用しない。
+//   下記assessRisk内のhazardKeys参照。データ・タイル取得ロジック自体は
+//   components/hazardLayers.ts に残しており、削除はしていない）
 // - リアルタイムの降雨・河川水位・気象警報は「まだ使えないデータ」として明示し、
 //   将来のPhaseで追加できるよう、判定要素(RiskFactor)を配列で拡張できる構造にしている
 // - 現時点ではリアルタイム情報が無いため、🔴（最高リスク）は使用せず🟠までに抑える
@@ -64,7 +67,9 @@ export type RiskResult = {
   disclaimers: string[];
   position: { lat: number; lng: number };
   generatedAt: string;
-  // Phase5A.3: 洪水・内水氾濫・高潮のうち、何件を実際に判定できたかを示す。
+  // Phase5A.3: 洪水・内水氾濫のうち、何件を実際に判定できたかを示す
+  // （試作2で高潮を対象から除外したため、Phase5A.3時点の「3件中」から
+  //   「2件中」に変わった。下記assessRisk内のhazardKeys参照）。
   // "unavailable"（全件unknown）の場合、levelは"unknown"になる。
   // "partial"の場合でも、判定できたハザードの情報でlevelを算出する
   // （unknownの存在によって既知のリスクを引き下げない）。
@@ -135,7 +140,7 @@ function scoreToLevel(score: number): RiskLevel {
 const RECOMMENDATION_TEXT: Record<RiskLevel, string> = {
   // Phase5A.3: 「通信エラー」に限定しない文言に修正（データ未整備等、原因は複数ありうる）
   unknown:
-    "洪水・内水氾濫・高潮のいずれについても、ハザード情報を確認できませんでした（通信環境の問題、またはこの地点のデータが整備されていない可能性があります）。地図上のハザード表示を目視でご確認いただくか、しばらくしてから再度お試しください。",
+    "洪水・内水氾濫のいずれについても、ハザード情報を確認できませんでした（通信環境の問題、またはこの地点のデータが整備されていない可能性があります）。地図上のハザード表示を目視でご確認いただくか、しばらくしてから再度お試しください。",
   safe: "ハザードマップ上では大きな浸水リスクは確認されていません。念のため、今後の気象情報にも注意しておきましょう。",
   caution:
     "ハザードマップ上でわずかな浸水リスクが想定されています。今後の気象情報に注意し、お住まいの地域の避難場所や避難経路を事前に確認しておきましょう。",
@@ -145,7 +150,13 @@ const RECOMMENDATION_TEXT: Record<RiskLevel, string> = {
 };
 
 export async function assessRisk(lat: number, lng: number): Promise<RiskResult> {
-  const hazardKeys: HazardKey[] = ["flood", "inundation", "hightide"];
+  // 試作2（要件定義書2 §5・§31③）: 高潮を研究対象から除外したため、
+  // RiskLevel・assessmentCompletenessの算出対象は洪水・内水氾濫の2つのみとする。
+  // 【重要】これはUI表示だけを隠すのではなく、算出そのものから高潮を外すことで、
+  // 「画面に出ないだけで内部判定には使われている」状態を防ぐための変更。
+  // 高潮のタイルURL・判定関数自体は components/hazardLayers.ts に残している
+  // （完全削除はしない。将来的な再対応や他機能からの参照に備える）。
+  const hazardKeys: HazardKey[] = ["flood", "inundation"];
 
   // 静的ハザード判定・標高・降雨実況は互いに独立しているため並行取得する。
   // 降雨の取得に失敗しても、静的ハザード判定（Phase3の評価）には一切影響しない。
@@ -164,8 +175,8 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
   // （Phase5A.2の監査で発覚したPhase3/Phase5の解釈不一致の是正。Phase5側の
   //   保守的な解釈に統一する）。判定できた(evaluated)ハザードのみでスコアを決める。
   // 重要: 一部のハザードがunknownでも、判定できた他のハザードの情報は失われない
-  // （例: 洪水=判定成功・内水氾濫=unknown・高潮=判定成功 なら、洪水と高潮の情報で
-  //   levelを決め、内水氾濫は「確認できません」として別途表示するのみ）。
+  // （例: 洪水=判定成功・内水氾濫=unknown なら、洪水の情報でlevelを決め、
+  //   内水氾濫は「確認できません」として別途表示するのみ）。
   hazardKeys.forEach((key, i) => {
     const r = hazardResults[i];
     if (r.status === "evaluated") {
@@ -222,11 +233,11 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
 
   const disclaimers = [
     "これはハザードマップ等の静的な情報に基づくアプリ独自の参考評価であり、公式の避難情報ではありません。",
-    "大雨や高潮が実際に発生した場合を想定したハザードマップに基づく評価です。現在の降雨状況（表示している場合も含む）は、この危険度の判定には反映していません。",
+    "大雨が実際に発生した場合を想定したハザードマップに基づく評価です。現在の降雨状況（表示している場合も含む）は、この危険度の判定には反映していません。",
   ];
   if (assessmentCompleteness === "partial") {
     disclaimers.push(
-      "洪水・内水氾濫・高潮の一部について、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。"
+      "洪水・内水氾濫の一部について、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。"
     );
   }
 

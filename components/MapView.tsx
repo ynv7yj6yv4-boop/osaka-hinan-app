@@ -31,6 +31,12 @@ const defaultIcon = L.icon({
 const OSAKA_CITY_CENTER: [number, number] = [34.6937, 135.5023];
 const DEFAULT_ZOOM = 13;
 
+// 試作2（要件定義書2 §5・§32）: 高潮を研究対象から除外したため、
+// ハザード切替UIの選択肢からは高潮を外す。
+// 【重要】components/hazardLayers.ts のHAZARD_BUTTONS自体（高潮のタイルURL等）は
+// 削除していない。ここではUI表示用に絞り込むだけで、データは残す。
+const DISPLAYABLE_HAZARD_BUTTONS = HAZARD_BUTTONS.filter((h) => h.key !== "hightide");
+
 type LatLng = { lat: number; lng: number };
 
 /** 現在地が取得できたら地図の表示範囲をそこへ移動させるための内部コンポーネント */
@@ -123,18 +129,15 @@ export default function MapView() {
     );
   };
 
-  // 洪水以外(内水氾濫・高潮)のみでリスクが出ている場合、参考避難ルート機能が
+  // 洪水以外(内水氾濫)のみでリスクが出ている場合、参考避難ルート機能が
   // その原因ハザードに対応していないことを案内するためのフラグ。
   // Phase5Aの洪水専用ルート評価ロジックそのものは変更していない。
+  // 試作2: 高潮はlib/riskAssessment.tsのRiskLevel算出対象から除外したため、
+  // ここでの比較対象も内水氾濫のみとする（riskResult.factorsにも高潮は含まれなくなった）。
   const floodFactor = riskResult?.factors.find((f) => f.key === "flood");
-  const otherHazardScore = riskResult
-    ? Math.max(
-        riskResult.factors.find((f) => f.key === "inundation")?.score ?? 0,
-        riskResult.factors.find((f) => f.key === "hightide")?.score ?? 0
-      )
-    : 0;
+  const inundationScore = riskResult?.factors.find((f) => f.key === "inundation")?.score ?? 0;
   const floodIsNotThePrimaryHazard = Boolean(
-    riskResult && otherHazardScore > 0 && (floodFactor?.score ?? 0) === 0
+    riskResult && inundationScore > 0 && (floodFactor?.score ?? 0) === 0
   );
 
   return (
@@ -173,13 +176,14 @@ export default function MapView() {
 
       {position && (
         <div className="px-3 pt-2">
-          {/* Phase6.1: 現在の主なリスクが洪水以外(高潮・内水氾濫)の場合、
+          {/* Phase6.1: 現在の主なリスクが洪水以外(内水氾濫)の場合、
               この機能が「現在のリスクへの対応」であるかのように見えないよう、
               ボタンを押す前に注意書きを先に表示し、ボタン自体の見た目も
-              控えめにする（洪水対応機能そのものは非表示にしない）。 */}
+              控えめにする（洪水対応機能そのものは非表示にしない）。
+              試作2: 高潮を対象から除外したため、文言も内水氾濫のみに変更。 */}
           {floodIsNotThePrimaryHazard && (
             <p className="mb-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-              ⚠ 現在の危険度は主に高潮・内水氾濫によるものです。下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
+              ⚠ 現在の危険度は主に内水氾濫によるものです。下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
             </p>
           )}
           <button
@@ -197,7 +201,7 @@ export default function MapView() {
       )}
 
       {/* 試作2: 常時2行分の高さを占めていたハザード切替を折りたたみ式にし、
-          既定では閉じておく（地図優先。切替の判定ロジック・選択肢は変更なし）。 */}
+          既定では閉じておく（地図優先）。選択肢は高潮除外により3択に変更。 */}
       <div className="bg-zinc-100 border-b-2 border-zinc-200">
         <button
           type="button"
@@ -209,8 +213,8 @@ export default function MapView() {
           <span>
             🗺️ ハザード表示：
             {activeHazard
-              ? `${HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.emoji ?? ""} ${
-                  HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
+              ? `${DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.emoji ?? ""} ${
+                  DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
                 }`
               : "表示しない"}
           </span>
@@ -221,7 +225,7 @@ export default function MapView() {
             id="hazard-toggle-panel"
             role="group"
             aria-label="ハザード情報の表示切り替え"
-            className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 pb-2.5"
+            className="grid grid-cols-3 gap-2 px-3 pb-2.5"
           >
             <button
               type="button"
@@ -235,7 +239,7 @@ export default function MapView() {
             >
               表示しない
             </button>
-            {HAZARD_BUTTONS.map((h) => (
+            {DISPLAYABLE_HAZARD_BUTTONS.map((h) => (
               <button
                 key={h.key}
                 type="button"
