@@ -7,6 +7,7 @@
 
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 
 let adminApp: App | null = null;
 
@@ -40,4 +41,9 @@ function getAdminApp(): App {
 
 export function getAdminMessaging() {
   return getMessaging(getAdminApp());
+}
+
+// 試作3 PART D・E: 通知対象地点(monitoringPoints)の永続化に使用する。
+export function getAdminFirestore() {
+  return getFirestore(getAdminApp());
 }

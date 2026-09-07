@@ -1,6 +1,7 @@
 "use client";
 
 import { RISK_LEVEL_INFO, type RiskResult } from "@/lib/riskAssessment";
+import MonitoringPointSection from "./MonitoringPointSection";
 
 // 内部の英語表現(complete/partial/unavailable)を、一般ユーザー向けの日本語に変換する。
 // 試作2: 高潮を研究対象から除外したため、対象ハザードは洪水・内水氾濫の2つ
@@ -104,6 +105,8 @@ export default function RiskDetailModal({
           <h2 className="text-base font-bold text-zinc-900">推奨行動</h2>
           <p className="mt-1 text-base text-zinc-800">{result.recommendation}</p>
         </section>
+
+        <MonitoringPointSection position={result.position} />
 
         <section className="mt-4 border-t border-zinc-200 pt-3">
           {result.disclaimers.map((d, i) => (
