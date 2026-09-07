@@ -54,14 +54,19 @@ export async function requestFcmToken(): Promise<FcmRegistrationResult> {
     return { state: "error", message: "サーバー側では実行できません" };
   }
 
-  if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-    return { state: "unsupported" };
-  }
-
   // PART B-4: iOSはホーム画面に追加(standalone起動)していないとPush通知APIが
   // 使えない。「Safariで開けば必ず使える」という前提を置かない。
+  // 【重要】この判定は「Notification in window」のチェックより先に行う。
+  // iOS Safariでホーム画面未追加の場合、Notification API自体が
+  // window に存在しないことがあり、先に汎用のunsupported判定をしてしまうと
+  // 「ホーム画面に追加すれば使える」という本来伝えるべき情報が
+  // 「この端末は対応していません」という誤解を招く表現に潰れてしまうため。
   if (isIosSafariNotStandalone()) {
     return { state: "not-installed", message: "ホーム画面に追加してから再度お試しください" };
+  }
+
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+    return { state: "unsupported" };
   }
 
   if (!hasFirebaseConfig()) {
