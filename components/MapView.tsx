@@ -231,9 +231,13 @@ export default function MapView() {
       {/* ==== 前面レイヤー：地図の上に重ねる情報 ====
           親には pointer-events-none を指定し、地図のドラッグ・ピンチ操作を
           遮らないようにする。実際に操作可能な各カード側で pointer-events-auto を
-          個別に指定する（iPhoneのノッチ・ステータスバー等はsafe-area-insetで回避）。 */}
+          個別に指定する（iPhoneのノッチ・ステータスバー等はsafe-area-insetで回避）。
+          横向き(landscape)は画面高さが極端に低くなり、縦積みの上下オーバーレイ
+          だけで画面のほとんどを覆って地図が見えなくなってしまうため、横向きの
+          ときだけ画面幅いっぱいではなく左側の細い帯に収める（右側〜中央に
+          地図の視認領域を確保する）。判定ロジック・表示内容自体は変更なし。 */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex flex-col gap-2 p-3"
+        className="pointer-events-none absolute left-0 right-0 top-0 z-[1000] flex flex-col gap-2 p-3 [@media(orientation:landscape)]:right-auto [@media(orientation:landscape)]:w-[340px] [@media(orientation:landscape)]:max-w-[75vw]"
         style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
       >
         {/* アプリ名 + 短い常時免責（要件定義書2 I-6: 詳細はRiskDetailModal側に集約） */}
@@ -276,9 +280,11 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* 下部オーバーレイ：ハザード切替・洪水CTA（現在地取得ボタンとの重なりを避けるため右側を空ける） */}
+      {/* 下部オーバーレイ：ハザード切替・洪水CTA（縦向きは現在地取得ボタンとの
+          重なりを避けるため右側を空ける。横向きは左側の細い帯に収め、
+          右下の現在地取得ボタン・地図の視認領域を確保する）。 */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[999] flex flex-col gap-2 p-3 pr-24"
+        className="pointer-events-none absolute left-0 right-0 bottom-0 z-[999] flex flex-col gap-2 p-3 pr-24 [@media(orientation:landscape)]:right-auto [@media(orientation:landscape)]:w-[340px] [@media(orientation:landscape)]:max-w-[75vw] [@media(orientation:landscape)]:pr-3"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {position && (
