@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ただし値を含まない変数名一覧は例外としてコミットする
+!.env.local.example
 
 # vercel
 .vercel

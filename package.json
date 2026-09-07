@@ -10,6 +10,8 @@
     "test": "node --test lib/*.test.ts"
   },
   "dependencies": {
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "next": "16.3.4",

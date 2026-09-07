@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import DevNotificationTester from "@/components/DevNotificationTester";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -42,6 +43,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegister />
         {children}
+        {/* 試作3 PART C-3・H: 開発者専用。NEXT_PUBLIC_ENABLE_DEV_TOOLS=1の
+            場合のみ表示（一般ユーザーには表示されない）。 */}
+        {process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "1" && <DevNotificationTester />}
       </body>
     </html>
   );
