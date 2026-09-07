@@ -50,6 +50,34 @@ function RecenterOnLocate({ position }: { position: LatLng | null }) {
   return null;
 }
 
+// 試作3（要件定義書2 PART I-4）: 地図を画面全体の背景として敷く構成に変更したため、
+// パネル開閉自体では地図コンテナのサイズは変わらなくなった（オーバーレイのため）。
+// ただし、スマホの画面回転・アドレスバーの表示/非表示による実際の表示領域の変化では
+// Leafletのタイルが正しく再計算されない（グレーになる/中心がずれる）ことがあるため、
+// ウィンドウのリサイズ時にinvalidateSize()を呼び、明示的に再計算させる。
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    // マウント直後の初回描画がずれることがあるため、少し遅らせて一度実行する
+    const initialTimer = setTimeout(() => map.invalidateSize(), 200);
+
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+
+    // visualViewport（アドレスバーの表示/非表示等）が使える場合は合わせて監視する
+    window.visualViewport?.addEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(initialTimer);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+      window.visualViewport?.removeEventListener("resize", handleResize);
+    };
+  }, [map]);
+  return null;
+}
+
 export default function MapView() {
   const [position, setPosition] = useState<LatLng | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -140,210 +168,242 @@ export default function MapView() {
     riskResult && inundationScore > 0 && (floodFactor?.score ?? 0) === 0
   );
 
+  // 試作3（要件定義書2 PART I）: 「地図を背景・中心にして、必要情報を重ねる」構成へ変更。
+  // 情報カード・ボタンを縦に積み上げて地図を圧迫する旧構成をやめ、
+  // 地図を画面全体(100dvh)の背景として敷き、その上に必要な情報だけを
+  // 浮かせて重ねる(絶対配置のオーバーレイ)。判定ロジック・各要素の文言や
+  // 表示条件そのものは変更していない（表示位置のみ変更）。
   return (
-    <div className="flex flex-col h-dvh w-full">
-      <header className="px-4 py-3 bg-white border-b-2 border-zinc-200">
-        <h1 className="text-xl font-bold text-zinc-900 leading-tight">
-          大阪市 避難支援マップ（試作版）
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          これは参考情報です。公式の避難情報は必ず自治体の発表をご確認ください。
-        </p>
-      </header>
+    <div className="relative h-dvh w-full overflow-hidden bg-zinc-200">
+      {/* ==== 背景レイヤー：地図（画面全体） ==== */}
+      <MapContainer
+        center={OSAKA_CITY_CENTER}
+        zoom={DEFAULT_ZOOM}
+        className="absolute inset-0 h-full w-full z-0"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
+          url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+        />
 
-      {!position && <IntroPanel isLocating={isLocating} onLocate={handleLocate} />}
+        {activeHazard && (
+          <TileLayer
+            key={activeHazard}
+            attribution={HAZARD_ATTRIBUTION}
+            url={HAZARD_TILE_URL[activeHazard]}
+            opacity={0.6}
+          />
+        )}
 
-      {position && areaCheck === "clearly_outside" && (
-        <div className="mx-3 mt-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-900">
-          現在地は大阪市エリアから明らかに離れている可能性があります。本アプリは大阪市を対象としており、表示される情報は実際と異なります。
-        </div>
-      )}
+        <ShelterLayer activeHazard={activeHazard} />
 
-      {/* Phase6.1: 矩形内であっても「大阪市内である」ことは確認できていないため、
-          常に対象地域を明示する（隣接自治体の地点でも表示される）。
-          試作2: 地図優先レイアウトのため1行に収まる分量にコンパクト化（文言・判定は変更なし）。 */}
-      {position && areaCheck === "likely_osaka_or_nearby" && (
-        <div className="mx-3 mt-2 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1 text-xs text-zinc-600">
-          現在のMVPは大阪市が対象です（市外では情報が不正確な場合があります）
-        </div>
-      )}
+        {position && (
+          <Marker position={[position.lat, position.lng]} icon={defaultIcon}>
+            <Popup>現在地（おおよその位置）</Popup>
+          </Marker>
+        )}
 
-      <RiskCard
-        result={riskResult}
-        isLoading={isAssessingRisk}
-        onOpenDetail={() => setShowRiskDetail(true)}
-      />
-
-      {position && (
-        <div className="px-3 pt-2">
-          {/* Phase6.1: 現在の主なリスクが洪水以外(内水氾濫)の場合、
-              この機能が「現在のリスクへの対応」であるかのように見えないよう、
-              ボタンを押す前に注意書きを先に表示し、ボタン自体の見た目も
-              控えめにする（洪水対応機能そのものは非表示にしない）。
-              試作2: 高潮を対象から除外したため、文言も内水氾濫のみに変更。 */}
-          {floodIsNotThePrimaryHazard && (
-            <p className="mb-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-              ⚠ 現在の危険度は主に内水氾濫によるものです。下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowEvacuationPanel(true)}
-            className={
-              floodIsNotThePrimaryHazard
-                ? "w-full rounded-lg border-2 border-zinc-400 bg-white py-3 text-base font-bold text-zinc-700 active:bg-zinc-50"
-                : "w-full rounded-lg bg-emerald-700 py-3 text-base font-bold text-white active:bg-emerald-800"
+        {evacuationRoutes?.routes.map((r, i) => (
+          <Polyline
+            key={i}
+            positions={r.geometry.map((p) => [p.lat, p.lng])}
+            pathOptions={
+              i === evacuationRoutes.highlightedIndex
+                ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
+                : { color: "#9ca3af", weight: 3, opacity: 0.6, dashArray: "6 6" }
             }
-          >
-            🏃 洪水時の避難先候補を見る
-          </button>
-        </div>
-      )}
+          />
+        ))}
 
-      {/* 試作2: 常時2行分の高さを占めていたハザード切替を折りたたみ式にし、
-          既定では閉じておく（地図優先）。選択肢は高潮除外により3択に変更。 */}
-      <div className="bg-zinc-100 border-b-2 border-zinc-200">
-        <button
-          type="button"
-          onClick={() => setHazardPanelOpen((v) => !v)}
-          aria-expanded={hazardPanelOpen}
-          aria-controls="hazard-toggle-panel"
-          className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-bold text-zinc-700"
-        >
-          <span>
-            🗺️ ハザード表示：
-            {activeHazard
-              ? `${DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.emoji ?? ""} ${
-                  DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
-                }`
-              : "表示しない"}
-          </span>
-          <span aria-hidden>{hazardPanelOpen ? "▲ 閉じる" : "▼ 切り替える"}</span>
-        </button>
-        {hazardPanelOpen && (
-          <div
-            id="hazard-toggle-panel"
-            role="group"
-            aria-label="ハザード情報の表示切り替え"
-            className="grid grid-cols-3 gap-2 px-3 pb-2.5"
+        {evacuationRoutes && (
+          <Marker
+            position={[evacuationRoutes.destination.lat, evacuationRoutes.destination.lng]}
+            icon={defaultIcon}
           >
+            <Popup>{evacuationRoutes.destination.name}</Popup>
+          </Marker>
+        )}
+
+        <RecenterOnLocate position={position} />
+        <MapResizeHandler />
+      </MapContainer>
+
+      {/* ==== 前面レイヤー：地図の上に重ねる情報 ====
+          親には pointer-events-none を指定し、地図のドラッグ・ピンチ操作を
+          遮らないようにする。実際に操作可能な各カード側で pointer-events-auto を
+          個別に指定する（iPhoneのノッチ・ステータスバー等はsafe-area-insetで回避）。 */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex flex-col gap-2 p-3"
+        style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+      >
+        {/* アプリ名 + 短い常時免責（要件定義書2 I-6: 詳細はRiskDetailModal側に集約） */}
+        <div className="pointer-events-auto rounded-xl bg-white/95 px-3 py-1.5 shadow">
+          <h1 className="text-sm font-bold leading-tight text-zinc-900">
+            大阪市 避難支援マップ（試作版）
+          </h1>
+          <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">
+            ※参考情報です。公式情報も必ずご確認ください。
+          </p>
+        </div>
+
+        {!position && (
+          <div className="pointer-events-auto">
+            <IntroPanel isLocating={isLocating} onLocate={handleLocate} />
+          </div>
+        )}
+
+        {position && areaCheck === "clearly_outside" && (
+          <div className="pointer-events-auto rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
+            現在地は大阪市エリアから明らかに離れている可能性があります。本アプリは大阪市を対象としており、表示される情報は実際と異なります。
+          </div>
+        )}
+
+        {/* Phase6.1: 矩形内であっても「大阪市内である」ことは確認できていないため、
+            常に対象地域を明示する（隣接自治体の地点でも表示される）。
+            試作2: 地図優先レイアウトのため1行に収まる分量にコンパクト化（文言・判定は変更なし）。 */}
+        {position && areaCheck === "likely_osaka_or_nearby" && (
+          <div className="pointer-events-auto rounded-lg border border-zinc-300 bg-white/95 px-3 py-1 text-xs text-zinc-600 shadow">
+            現在のMVPは大阪市が対象です（市外では情報が不正確な場合があります）
+          </div>
+        )}
+
+        <div className="pointer-events-auto">
+          <RiskCard
+            result={riskResult}
+            isLoading={isAssessingRisk}
+            onOpenDetail={() => setShowRiskDetail(true)}
+          />
+        </div>
+      </div>
+
+      {/* 下部オーバーレイ：ハザード切替・洪水CTA（現在地取得ボタンとの重なりを避けるため右側を空ける） */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[999] flex flex-col gap-2 p-3 pr-24"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        {position && (
+          <div className="pointer-events-auto">
+            {/* Phase6.1: 現在の主なリスクが洪水以外(内水氾濫)の場合、
+                この機能が「現在のリスクへの対応」であるかのように見えないよう、
+                ボタンを押す前に注意書きを先に表示し、ボタン自体の見た目も
+                控えめにする（洪水対応機能そのものは非表示にしない）。
+                試作2: 高潮を対象から除外したため、文言も内水氾濫のみに変更。 */}
+            {floodIsNotThePrimaryHazard && (
+              <p className="mb-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 shadow">
+                ⚠ 現在の危険度は主に内水氾濫によるものです。下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
+              </p>
+            )}
             <button
               type="button"
-              onClick={() => setActiveHazard(null)}
-              aria-pressed={activeHazard === null}
-              className={`py-3 rounded-lg text-base font-bold border-2 ${
-                activeHazard === null
-                  ? "bg-zinc-800 text-white border-zinc-800"
-                  : "bg-white text-zinc-700 border-zinc-300"
-              }`}
+              onClick={() => setShowEvacuationPanel(true)}
+              className={
+                floodIsNotThePrimaryHazard
+                  ? "w-full rounded-lg border-2 border-zinc-400 bg-white py-3 text-base font-bold text-zinc-700 shadow active:bg-zinc-50"
+                  : "w-full rounded-lg bg-emerald-700 py-3 text-base font-bold text-white shadow active:bg-emerald-800"
+              }
             >
-              表示しない
+              🏃 洪水時の避難先候補を見る
             </button>
-            {DISPLAYABLE_HAZARD_BUTTONS.map((h) => (
+          </div>
+        )}
+
+        {/* 試作2: 常時2行分の高さを占めていたハザード切替を折りたたみ式にし、
+            既定では閉じておく（地図優先）。選択肢は高潮除外により3択に変更。
+            試作3: 全幅バーではなく、地図に浮かせた小型カードに変更。 */}
+        <div className="pointer-events-auto rounded-xl bg-white/95 shadow">
+          <button
+            type="button"
+            onClick={() => setHazardPanelOpen((v) => !v)}
+            aria-expanded={hazardPanelOpen}
+            aria-controls="hazard-toggle-panel"
+            className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-bold text-zinc-700"
+          >
+            <span>
+              🗺️ ハザード表示：
+              {activeHazard
+                ? `${DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.emoji ?? ""} ${
+                    DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
+                  }`
+                : "表示しない"}
+            </span>
+            <span aria-hidden>{hazardPanelOpen ? "▲ 閉じる" : "▼ 切り替える"}</span>
+          </button>
+          {hazardPanelOpen && (
+            <div
+              id="hazard-toggle-panel"
+              role="group"
+              aria-label="ハザード情報の表示切り替え"
+              className="grid grid-cols-3 gap-2 px-3 pb-2.5"
+            >
               <button
-                key={h.key}
                 type="button"
-                onClick={() => setActiveHazard(h.key)}
-                aria-pressed={activeHazard === h.key}
+                onClick={() => setActiveHazard(null)}
+                aria-pressed={activeHazard === null}
                 className={`py-3 rounded-lg text-base font-bold border-2 ${
-                  activeHazard === h.key
-                    ? "bg-blue-700 text-white border-blue-700"
+                  activeHazard === null
+                    ? "bg-zinc-800 text-white border-zinc-800"
                     : "bg-white text-zinc-700 border-zinc-300"
                 }`}
               >
-                {h.emoji} {h.label}
+                表示しない
               </button>
-            ))}
+              {DISPLAYABLE_HAZARD_BUTTONS.map((h) => (
+                <button
+                  key={h.key}
+                  type="button"
+                  onClick={() => setActiveHazard(h.key)}
+                  aria-pressed={activeHazard === h.key}
+                  className={`py-3 rounded-lg text-base font-bold border-2 ${
+                    activeHazard === h.key
+                      ? "bg-blue-700 text-white border-blue-700"
+                      : "bg-white text-zinc-700 border-zinc-300"
+                  }`}
+                >
+                  {h.emoji} {h.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="pointer-events-auto rounded-lg border-2 border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 shadow"
+          >
+            {errorMessage}
           </div>
         )}
       </div>
 
-      <div className="relative flex-1">
-        <MapContainer
-          center={OSAKA_CITY_CENTER}
-          zoom={DEFAULT_ZOOM}
-          className="h-full w-full"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
-            url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
-          />
+      {/* 現在地取得ボタン（右下固定）。下部オーバーレイはpr-24で右側を空けているため重ならない */}
+      <button
+        type="button"
+        onClick={handleLocate}
+        disabled={isLocating}
+        className="absolute bottom-6 right-4 z-[1000] flex items-center gap-2 rounded-full bg-blue-700 px-5 py-4 text-base font-bold text-white shadow-lg active:bg-blue-800 disabled:opacity-60"
+        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+        aria-label={position ? "現在地を再取得する" : "現在地を取得する"}
+      >
+        {isLocating ? "確認中…" : position ? "📍 再取得" : "📍 現在地"}
+      </button>
 
-          {activeHazard && (
-            <TileLayer
-              key={activeHazard}
-              attribution={HAZARD_ATTRIBUTION}
-              url={HAZARD_TILE_URL[activeHazard]}
-              opacity={0.6}
-            />
-          )}
-
-          <ShelterLayer activeHazard={activeHazard} />
-
-          {position && (
-            <Marker position={[position.lat, position.lng]} icon={defaultIcon}>
-              <Popup>現在地（おおよその位置）</Popup>
-            </Marker>
-          )}
-
-          {evacuationRoutes?.routes.map((r, i) => (
-            <Polyline
-              key={i}
-              positions={r.geometry.map((p) => [p.lat, p.lng])}
-              pathOptions={
-                i === evacuationRoutes.highlightedIndex
-                  ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
-                  : { color: "#9ca3af", weight: 3, opacity: 0.6, dashArray: "6 6" }
-              }
-            />
-          ))}
-
-          {evacuationRoutes && (
-            <Marker
-              position={[evacuationRoutes.destination.lat, evacuationRoutes.destination.lng]}
-              icon={defaultIcon}
-            >
-              <Popup>{evacuationRoutes.destination.name}</Popup>
-            </Marker>
-          )}
-
-          <RecenterOnLocate position={position} />
-        </MapContainer>
-
-        <button
-          type="button"
-          onClick={handleLocate}
-          disabled={isLocating}
-          className="absolute bottom-6 right-4 z-[1000] flex items-center gap-2 rounded-full bg-blue-700 px-6 py-4 text-lg font-bold text-white shadow-lg active:bg-blue-800 disabled:opacity-60"
-          aria-label={position ? "現在地を再取得する" : "現在地を取得する"}
-        >
-          {isLocating ? "確認しています…" : position ? "📍 現在地を再取得" : "📍 現在地を取得"}
-        </button>
-
-        {activeHazard && (
-          <div className="absolute bottom-6 left-4 z-[1000] flex flex-col gap-1 rounded-lg bg-white/95 px-3 py-2 text-xs text-zinc-700 shadow">
-            <div className="flex items-center gap-1">
-              <span className="inline-block h-3 w-3 rounded-full bg-green-600" />
-              選択中の災害でも使える避難場所
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block h-3 w-3 rounded-full bg-zinc-500" />
-              その他の指定緊急避難場所
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block h-3 w-3 rounded-full bg-blue-600" />
-              指定避難所
-            </div>
+      {/* ハザード切替パネルを開いている間は下部オーバーレイが縦に伸びるため、
+          凡例と重ならないよう一時的に隠す（判定・データ自体は無関係）。 */}
+      {activeHazard && !hazardPanelOpen && (
+        <div className="absolute bottom-24 left-4 z-[1000] flex flex-col gap-1 rounded-lg bg-white/95 px-3 py-2 text-xs text-zinc-700 shadow">
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-3 rounded-full bg-green-600" />
+            選択中の災害でも使える避難場所
           </div>
-        )}
-      </div>
-
-      {errorMessage && (
-        <div
-          role="alert"
-          className="px-4 py-3 bg-red-50 border-t-2 border-red-300 text-red-800 text-base font-medium"
-        >
-          {errorMessage}
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-3 rounded-full bg-zinc-500" />
+            その他の指定緊急避難場所
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-3 rounded-full bg-blue-600" />
+            指定避難所
+          </div>
         </div>
       )}
 
