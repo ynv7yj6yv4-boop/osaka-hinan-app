@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 試作3: functions/ はFirebase Functions用の独立したプロジェクト
+    // （別のnode_modules・tsconfigを持つ）。Next.jsアプリ用のこのESLint設定の
+    // 対象外とする（functions/自体にはtscによる型チェックがある）。
+    "functions/**",
   ]),
 ]);
 

@@ -28,7 +28,9 @@ function buildTileUrlTemplate(basetime: string): string {
 }
 
 // "20260905195000" (YYYYMMDDHHMMSS, JST) -> "19:50"
-function formatJmaTimeAsClock(raw: string): string {
+// 試作3: lib/rainfallForecast.ts（実況とは別モジュール）でも同じ表示形式を
+// 使うため、追加のみの変更としてexportする（挙動は変更していない）。
+export function formatJmaTimeAsClock(raw: string): string {
   if (raw.length !== 14) return raw;
   return `${raw.slice(8, 10)}:${raw.slice(10, 12)}`;
 }

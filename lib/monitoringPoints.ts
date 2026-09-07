@@ -36,7 +36,11 @@ export type MonitoringPointInfo = {
   longitude: number;
   enabledHazards: string[];
   notificationEnabled: boolean;
-  lastNotification: { status: string; at: string } | null;
+  // 試作3 PART1-3: 重複通知防止・監視ジョブ技術検証用フィールド(まだ実運用はしていない)
+  lastNotificationState: string | null;
+  lastNotifiedAt: string | null;
+  lastEvaluatedForecastTime: string | null;
+  decisionVersion: string | null;
 };
 
 export async function registerMonitoringPoint(params: {

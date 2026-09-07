@@ -187,6 +187,12 @@ export function findUpcomingStep(
 // これらは研究上の「災害リスク判定」ではなく、ナビゲーションUIの表示
 // タイミングを決めるものだが、根拠のない数値を独自に決定しないという
 // 開発方針(基本ルール1)に沿って、上記の理由を明記している。
+//
+// 【重要・試作3 次段階 PART 7】以下の値は実地テスト前の**暫定設定値**であり、
+// 「検証済みの最適値」ではない。実際に歩いて、(1)正しくルート上にいる時に
+// 誤って逸脱扱いされないか、(2)実際に道を外れた時に検出できるか、
+// (3)建物の多い場所でGPS誤差がどう影響するか、を確認してから確定させる
+// （data/README.mdにも同内容を記載）。
 export const OFF_ROUTE_BASE_METERS = 30;
 export const OFF_ROUTE_ACCURACY_MULTIPLIER = 1.5;
 export const OFF_ROUTE_CONSECUTIVE_READINGS = 3;
@@ -237,6 +243,10 @@ export function updateOffRouteState(
 // 持つ施設であり、施設の代表点(緯度経度1点)と実際の入口・敷地境界との間には
 // 数m〜数十mの差がありうる。GPS誤差も加わるため、「敷地に到着した」ではなく
 // 「付近に到着した」という表現(A-8の指示どおり)を用いる前提で30mとした。
+//
+// 【重要・試作3 次段階 PART 8】これも実地テスト前の**暫定設定値**である。
+// 「安全な場所へ到着しました」等の断定表現は使用しない方針を維持したまま、
+// 実地テストの結果に応じて数値のみ調整する想定。
 export const ARRIVAL_BASE_METERS = 30;
 
 export function hasArrivedNearDestination(

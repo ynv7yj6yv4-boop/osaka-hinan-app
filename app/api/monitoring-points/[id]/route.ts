@@ -14,7 +14,12 @@ type MonitoringPointDoc = {
   enabledHazards: string[];
   notificationEnabled: boolean;
   fcmToken: string;
-  lastNotification: { status: string; at: string } | null;
+  // 試作3 PART1-3: 重複通知防止・監視ジョブ技術検証用フィールド
+  lastNotificationState: string | null;
+  lastNotifiedAt: string | null;
+  lastEvaluatedForecastTime: string | null;
+  lastCheckedAt: unknown;
+  decisionVersion: string | null;
 };
 
 async function verifyOwnership(
@@ -51,7 +56,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       longitude: data.longitude,
       enabledHazards: data.enabledHazards,
       notificationEnabled: data.notificationEnabled,
-      lastNotification: data.lastNotification ?? null,
+      lastNotificationState: data.lastNotificationState ?? null,
+      lastNotifiedAt: data.lastNotifiedAt ?? null,
+      lastEvaluatedForecastTime: data.lastEvaluatedForecastTime ?? null,
+      decisionVersion: data.decisionVersion ?? null,
     });
   } catch (err) {
     console.error("[monitoring-points/:id GET] 失敗しました", err);

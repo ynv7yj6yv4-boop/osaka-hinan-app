@@ -5,10 +5,16 @@
 // エンドポイントは監視地点をFirestoreから読み取り・書き込みできることだけを
 // 確認し、通知は一切送信しない（notificationsSentは常に0）。
 //
+// 【試作3 次段階 PART 5との関係・重要】本番の定期監視は
+// functions/src/index.ts（Firebase Scheduled Functions）に一本化した。
+// vercel.jsonからは自動実行(crons)の設定を削除済みのため、このエンドポイントは
+// **自動では呼び出されない**。CRON_SECRETを知っている開発者が手動で
+// （curl等で）呼び出す、配管確認・デバッグ専用のエンドポイントとして残している。
+// Vercel側とFirebase側の両方が同時に本番監視を行う「二重監視」状態には
+// していない。
+//
 // 【セキュリティ】PART G-2: 環境変数CRON_SECRETと一致する
 // "Authorization: Bearer <値>" ヘッダーが無い場合は拒否する。
-// Vercel Cron Jobsは、vercel.jsonで設定したジョブを実行する際、
-// 自動的にこのヘッダーを付けてリクエストする(値はCRON_SECRET環境変数と同じ)。
 
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";

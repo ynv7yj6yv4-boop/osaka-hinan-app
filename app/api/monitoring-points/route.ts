@@ -55,7 +55,14 @@ export async function POST(request: Request) {
       notificationEnabled: true,
       fcmToken,
       createdAt: FieldValue.serverTimestamp(),
-      lastNotification: null,
+      // 試作3 PART1-3: 重複通知防止・監視ジョブの技術検証用フィールド
+      // （要件定義書2 PART G-3・1-3）。実際の通知はまだ送っていないため
+      // すべてnullで初期化する。
+      lastNotificationState: null,
+      lastNotifiedAt: null,
+      lastEvaluatedForecastTime: null,
+      lastCheckedAt: null,
+      decisionVersion: null,
     });
     return NextResponse.json({ monitoringPointId: docRef.id });
   } catch (err) {

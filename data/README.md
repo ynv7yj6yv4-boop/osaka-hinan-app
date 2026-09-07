@@ -244,3 +244,102 @@ Phase3の危険度判定に、洪水・内水氾濫・高潮のうち何件を�
 ## データ更新について
 
 避難所データは市町村の登録更新に伴い変わるため、`scripts/build-shelters.mjs` を再実行して定期的に更新することを推奨します（次回以降のPhaseで検討）。
+
+---
+
+# 試作3（要件定義書2以降）で判明・追加した内容
+
+## openrouteserviceの案内情報(instructions)・言語対応の検証結果
+
+- **確認日**: 2026-09-08
+- 現在使用中のリクエスト内容（`instructions`パラメータを指定しない）でも、
+  ORSはデフォルトで`properties.segments[0].steps`（曲がり方コード`type`・
+  `instruction`(英語)・`distance`・`duration`・`name`・`way_points`）を返す
+  ことを実際のAPI呼び出しで確認済み。リクエスト内容の変更は不要だった。
+- **`language: "ja"`パラメータは実際には使用できない**。実際にAPIへ
+  問い合わせたところ、このパラメータを付けると502エラーになった。
+  ORS公式のOpenAPI仕様（Languages enum）を検索した限りでも日本語は
+  列挙されておらず、「日本語対応済み」とする一部の二次情報は誤りの
+  可能性が高い（対応状況を推測しないという方針に基づき、実地検証の結果を
+  優先した）。
+- 曲がり方コード(`type`, 0〜13)の意味は、ORS公式ドキュメント
+  （https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/instruction-types ）
+  で確認済み。この数値コードと`name`（道路名。OSMデータのため日本語の
+  場合が多い）・`distance`を組み合わせ、日本語の案内文を独自に組み立てる
+  方式を採用した（`lib/navigation.ts`の`describeStep()`）。
+
+## 降雨予測データ（高解像度降水ナウキャスト予測, N2系列）の発見
+
+- **確認日**: 2026-09-07
+- Phase4Aの実況取得で使用している`targetTimes_N1.json`は実況のみ
+  （`basetime`＝`validtime`、過去方向にのみ並ぶ）だが、隣接する
+  `https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N2.json`
+  を実際に取得したところ、`basetime`（実況の最新時刻）を固定したまま、
+  `validtime`が5分刻みで60分先まで進む12件のエントリが確認できた。
+  タイルURLの構造（`/{basetime}/none/{validtime}/surf/hrpns/...`）は
+  実況と同じで、`validtime`部分だけを差し替える形になっている。
+- 気象庁の解説にある「高解像度降水ナウキャスト（予測）：30分先までの
+  5分毎予測」に対応する系列と考えられるが、この対応関係自体は状況証拠
+  であり、気象庁の一次資料による確認ではない。
+- **実況と同じ限界を引き継ぐ**：非公式URL（予告なき変更・停止のリスク）、
+  色→mm/hの対応が一次資料で完全確認できていない、という2点は実況と同一。
+  加えて「予測」であるため、外れる可能性がある。
+- 実装は`lib/rainfallForecast.ts`（実況の`lib/rainfallObservation.ts`とは
+  完全に別モジュール。要件定義書2 PART F-2の方針どおり）。
+- より公式性の高い「降水短時間予報」（1km解像度・最大15時間先）は、
+  気象業務支援センター(JMBSC)経由の有償契約が必要な可能性が高く、
+  今回は技術的な利用可否を検証できていない。
+
+## 気象庁「雨の強さと降り方」表（通知判定の検討材料）
+
+- **出典**: 気象庁公式サイト（https://www.jma.go.jp/jma/kishou/know/yougo_hp/amehyo.html ）
+- 10〜20mm/h未満: やや強い雨／20〜30mm/h未満: 強い雨／
+  30〜50mm/h未満: 激しい雨／50〜80mm/h未満: 非常に激しい雨／
+  80mm/h以上: 猛烈な雨
+- `lib/rainfallColorLegend.ts`のrank4〜8は、この公式区分と対応するように
+  作成されている（ただし色→mm/hの対応自体は上記のとおり状況証拠であり、
+  一次資料による確認ではない点に注意）。
+- この表は「雨の強さの一般的な区分」であり、「この強さになったら避難通知
+  を送るべき」という基準を気象庁が示しているわけではない。通知の閾値
+  そのものの根拠には使えない（PART4比較報告参照）。
+
+## ナビゲーションの逸脱・到着判定閾値（暫定値・未検証）
+
+`lib/navigation.ts`で使用している以下の値は、**実地テスト前の暫定設定値**
+であり、「検証済みの最適値」ではない。
+
+- `OFF_ROUTE_BASE_METERS = 30`（逸脱判定の基準距離）
+- `OFF_ROUTE_ACCURACY_MULTIPLIER = 1.5`（GPS精度に応じた倍率）
+- `OFF_ROUTE_CONSECUTIVE_READINGS = 3`（連続何回で逸脱扱いにするか）
+- `ARRIVAL_BASE_METERS = 30`（到着判定の基準距離）
+
+実地テストで、以下を確認してから確定させること。
+
+1. 正しくルート上を歩いているのに逸脱扱いされないか
+2. 実際に道を外れたとき、適切なタイミングで検出できるか
+3. 建物の多い場所でGPS誤差がどう影響するか
+
+## 通知判定フレームワーク（notificationDecision）の安全設計
+
+- `lib/notificationDecisionConfig.ts`の`enabled: false`が、実際の自動通知
+  送信を止める「総本山スイッチ」。この値がfalseである限り、
+  `lib/notificationDecision.ts`の`evaluateNotificationDecision()`は
+  どのような入力に対しても`"candidate"`を返さない（多重防御。
+  `lib/notificationDecision.test.ts`で検証済み）。
+- 現在の`rainfallRankThreshold`・`hazardDepthRankThreshold`・
+  `cooldownMinutes`は、いずれも**研究用に比較検討している候補値**であり、
+  公的資料による裏付けが不十分なため`enabled`はfalseのまま維持している。
+
+## Firebase Scheduled Functionsの技術的制約（重要・未解決）
+
+- `lib/tilePixel.ts`（ハザード・降雨タイルのピクセル読み取り）は、
+  ブラウザの`Canvas`/`Image`/`URL.createObjectURL`に依存しており、
+  Node.js環境（Firebase Cloud Functions）ではそのまま動作しない。
+- 判定ロジック自体（`hazardPixelClassifier.ts`の`interpretTileSample`、
+  `rainfallColorLegend.ts`の`matchRainfallColor`）は純粋な計算のため
+  サーバー側でも再利用できるが、「タイル画像を取得してピクセル色を読む」
+  というI/O部分だけは、Node.js対応の別実装（例: `pngjs`等によるPNG
+  デコード）が必要。**この部分は試作3時点で未実装**であり、
+  `functions/src/index.ts`の定期監視は現時点では実際の降雨予測・
+  静的ハザード情報を取得せず、常に`insufficient_data`相当のダミー入力で
+  評価関数を呼び出す配管確認にとどまっている。

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -17,6 +17,11 @@ import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck"
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 import type { NavigationDisplayState } from "@/lib/navigation";
+import {
+  buildLogEntry,
+  triggerVerificationLogDownload,
+  type NavVerificationLogEntry,
+} from "@/lib/navigationVerificationLog";
 
 // Leafletのデフォルトアイコン画像はNext.js環境だとパス解決に失敗するため、
 // CDN上の画像を明示的に指定して置き換える。
@@ -115,7 +120,24 @@ export default function MapView() {
   const [isRecalculatingRoute, setIsRecalculatingRoute] = useState(false);
   const [recalculateError, setRecalculateError] = useState<string | null>(null);
 
+  // 試作3 次段階 PART 2・6: ナビの実地検証用ログ（端末内メモリのみ・
+  // サーバーへは一切送信しない）。navigationMetaはレンダー中にも参照する
+  // ためstateにする(refをrender中に読むとReactの警告対象になるため)。
+  // verificationLogRefはログ本体(頻繁に追記されるだけで表示に使わない)なので
+  // refのままでよい。
+  const [navigationMeta, setNavigationMeta] = useState<{ startedAt: string; routeId: string } | null>(
+    null
+  );
+  const verificationLogRef = useRef<NavVerificationLogEntry[]>([]);
+
   const handleStartNavigation = (route: WalkingRoute, destination: FloodShelterCandidate) => {
+    const startedAt = new Date().toISOString();
+    const routeId = `${destination.id}-${startedAt}`;
+    setNavigationMeta({ startedAt, routeId });
+    verificationLogRef.current = [
+      buildLogEntry({ event: "started", navigationStartedAt: startedAt, selectedRouteId: routeId }),
+    ];
+
     setNavigationSession({ route, destination });
     setNavState(null);
     setRecalculateError(null);
@@ -126,6 +148,24 @@ export default function MapView() {
   const handleEndNavigation = () => {
     // A-1: 取得済みのルート表示自体は消さない（EvacuationPanelを閉じた後も
     // ルートを地図上で確認できる、という既存の挙動に合わせる）。
+    if (navigationMeta) {
+      const endedAt = new Date().toISOString();
+      verificationLogRef.current.push(
+        buildLogEntry({
+          event: "ended",
+          navigationStartedAt: navigationMeta.startedAt,
+          selectedRouteId: navigationMeta.routeId,
+          navigationEndedAt: endedAt,
+        })
+      );
+      // PART 6: 位置履歴はサーバーへ送らず、端末内のJSONファイルとして
+      // ダウンロードできるようにするだけ（研究・デバッグ用）。
+      triggerVerificationLogDownload(verificationLogRef.current);
+      console.log("[ナビ検証ログ]", verificationLogRef.current);
+    }
+    setNavigationMeta(null);
+    verificationLogRef.current = [];
+
     setNavigationSession(null);
     setNavState(null);
   };
@@ -296,11 +336,14 @@ export default function MapView() {
         {/* 試作3 PART A-3〜A-6: ナビ中のGPS追跡・逸脱判定・到着判定。
             A-1: navigationSession.route.geometryはナビ開始時に選択したまま
             固定で使用し、ここで別ルートへ再計算することはしない。 */}
-        {navigationSession && (
+        {navigationSession && navigationMeta && (
           <NavTracker
             route={navigationSession.route}
             destination={navigationSession.destination}
             onUpdate={setNavState}
+            navigationStartedAt={navigationMeta.startedAt}
+            selectedRouteId={navigationMeta.routeId}
+            onVerificationLogEntry={(entry) => verificationLogRef.current.push(entry)}
           />
         )}
       </MapContainer>

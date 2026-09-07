@@ -23,6 +23,7 @@ import {
   type NavigationDisplayState,
 } from "@/lib/navigation";
 import type { WalkingRoute } from "@/lib/evacuationRoute";
+import { buildLogEntry, type NavVerificationLogEntry } from "@/lib/navigationVerificationLog";
 
 // 通常の「現在地」マーカーと区別するため、ナビ中の追跡位置は別の見た目にする
 // （色だけに頼らないよう、青い円+白枠のシンプルな現在地ドットにしている）。
@@ -37,10 +38,17 @@ export default function NavTracker({
   route,
   destination,
   onUpdate,
+  navigationStartedAt,
+  selectedRouteId,
+  onVerificationLogEntry,
 }: {
   route: WalkingRoute;
   destination: LatLng;
   onUpdate: (state: NavigationDisplayState) => void;
+  /** 試作3 次段階 PART 6: 実地検証ログ用。ナビ開始時刻とルート識別子。 */
+  navigationStartedAt: string;
+  selectedRouteId: string;
+  onVerificationLogEntry: (entry: NavVerificationLogEntry) => void;
 }) {
   const map = useMap();
   const routePointsRef = useRef(buildRoutePoints(route.geometry));
@@ -92,6 +100,21 @@ export default function NavTracker({
         };
         lastStateRef.current = state;
         onUpdate(state);
+
+        // 試作3 次段階 PART 6: 実地検証用ログ（端末内メモリのみ。サーバーへは送信しない）。
+        onVerificationLogEntry(
+          buildLogEntry({
+            event: "update",
+            navigationStartedAt,
+            selectedRouteId,
+            gpsAccuracyMeters: accuracy,
+            position,
+            distanceRemainingMeters: state.distanceRemainingMeters,
+            currentInstruction: state.nextInstructionJa,
+            routeDeviation: state.isOffRoute,
+            hasArrived: state.hasArrived,
+          })
+        );
 
         // 初回のみ大きくズームして現在地に寄せ、以降はズームを変えずパンのみで追従する
         // （ユーザーが手動でズーム操作した場合にそれを勝手に上書きしない）。
