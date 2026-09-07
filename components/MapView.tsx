@@ -248,8 +248,12 @@ export default function MapView() {
       >
         {/* 上グループ：ヘッダー・地域案内・RiskCard */}
         <div className="flex flex-col gap-2">
-          {/* アプリ名 + 短い常時免責（要件定義書2 I-6: 詳細はRiskDetailModal側に集約） */}
-          <div className="pointer-events-auto rounded-xl bg-white/95 px-3 py-1.5 shadow">
+          {/* アプリ名 + 短い常時免責（要件定義書2 I-6: 詳細はRiskDetailModal側に集約）。
+              横向きは画面高さに余裕がなく、CTA・ハザード切替が画面外に押し出されて
+              しまうため、ユーザーとの合意により横向き時のみ非表示にする
+              （縦向きの表示は変更なし。免責自体を削除するわけではなく、
+              RiskDetailModal等で引き続き確認できる）。 */}
+          <div className="pointer-events-auto rounded-xl bg-white/95 px-3 py-1.5 shadow [@media(orientation:landscape)]:hidden">
             <h1 className="text-sm font-bold leading-tight text-zinc-900">
               大阪市 避難支援マップ（試作版）
             </h1>
@@ -272,9 +276,12 @@ export default function MapView() {
 
           {/* Phase6.1: 矩形内であっても「大阪市内である」ことは確認できていないため、
               常に対象地域を明示する（隣接自治体の地点でも表示される）。
-              試作2: 地図優先レイアウトのため1行に収まる分量にコンパクト化（文言・判定は変更なし）。 */}
+              試作2: 地図優先レイアウトのため1行に収まる分量にコンパクト化（文言・判定は変更なし）。
+              試作3: 横向きは高さの余裕を確保するため非表示（ユーザーとの合意）。
+              「明らかに大阪市外」の警告(clearly_outside)は安全上重要なため、
+              横向きでも引き続き表示する。 */}
           {position && areaCheck === "likely_osaka_or_nearby" && (
-            <div className="pointer-events-auto rounded-lg border border-zinc-300 bg-white/95 px-3 py-1 text-xs text-zinc-600 shadow">
+            <div className="pointer-events-auto rounded-lg border border-zinc-300 bg-white/95 px-3 py-1 text-xs text-zinc-600 shadow [@media(orientation:landscape)]:hidden">
               現在のMVPは大阪市が対象です（市外では情報が不正確な場合があります）
             </div>
           )}
