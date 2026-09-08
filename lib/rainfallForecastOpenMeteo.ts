@@ -31,8 +31,8 @@ const SOURCE = "open-meteo-jma-msm" as const;
 export type HourlyPrecipitationPoint = {
   /** ISO文字列。この1時間の終端時刻（Open-Meteoは「前1時間の合計」として値を返すため） */
   time: string;
-  /** mm（前1時間の降水量合計） */
-  precipitationMm: number;
+  /** mm（前1時間の降水量合計）。APIが値を返さなかった場合はnull（0mmと混同しない）。 */
+  precipitationMm: number | null;
 };
 
 export type OpenMeteoForecastResult =
@@ -82,7 +82,61 @@ export async function fetchHourlyPrecipitationForecast(
 
   const points: HourlyPrecipitationPoint[] = hourly.time.map((t, i) => ({
     time: t,
-    precipitationMm: typeof hourly.precipitation![i] === "number" ? hourly.precipitation![i] : 0,
+    precipitationMm: typeof hourly.precipitation![i] === "number" ? hourly.precipitation![i] : null,
+  }));
+
+  return { status: "ok", fetchedAt, hourly: points, source: SOURCE };
+}
+
+// 試作3 通知判定ロジックの実験実装 PART16: 過去に実際に発表された予報の
+// 時系列を取得する(Backtest用)。
+//
+// 【重要な限界】Open-Meteo公式ドキュメントによれば、このAPIは
+// 「各モデル更新の最初の数時間を継ぎ合わせた連続時系列」であり、
+// 3時間おきに発表される個別のモデルrun(forecast run)そのものを
+// 単体で取得するものではない。そのため、このデータを使った
+// forecast run間継続性の検証は「近似」であり、真に独立したrun単位の
+// アーカイブを使った検証ではないことをBacktestスクリプト側で明記する。
+const OPEN_METEO_HISTORICAL_URL = "https://historical-forecast-api.open-meteo.com/v1/forecast";
+
+export type HistoricalForecastResult =
+  | { status: "ok"; fetchedAt: string; hourly: HourlyPrecipitationPoint[]; source: typeof SOURCE }
+  | { status: "unavailable"; fetchedAt: string; source: typeof SOURCE };
+
+export async function fetchHistoricalHourlyPrecipitation(
+  lat: number,
+  lng: number,
+  startDate: string, // "YYYY-MM-DD"
+  endDate: string
+): Promise<HistoricalForecastResult> {
+  const fetchedAt = new Date().toISOString();
+  const url =
+    `${OPEN_METEO_HISTORICAL_URL}?latitude=${lat}&longitude=${lng}` +
+    `&hourly=precipitation&models=jma_msm&start_date=${startDate}&end_date=${endDate}&timezone=Asia%2FTokyo`;
+
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    return { status: "unavailable", fetchedAt, source: SOURCE };
+  }
+  if (!res.ok) return { status: "unavailable", fetchedAt, source: SOURCE };
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return { status: "unavailable", fetchedAt, source: SOURCE };
+  }
+
+  const hourly = (data as { hourly?: { time?: string[]; precipitation?: number[] } })?.hourly;
+  if (!hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.precipitation)) {
+    return { status: "unavailable", fetchedAt, source: SOURCE };
+  }
+
+  const points: HourlyPrecipitationPoint[] = hourly.time.map((t, i) => ({
+    time: t,
+    precipitationMm: typeof hourly.precipitation![i] === "number" ? hourly.precipitation![i] : null,
   }));
 
   return { status: "ok", fetchedAt, hourly: points, source: SOURCE };
@@ -118,7 +172,9 @@ export function computeAccumulatedRainfall(
   if (hourly.length < hoursNeeded) return null; // 外挿しない。データ不足ならnull
 
   const windowPoints = hourly.slice(0, hoursNeeded);
-  const rainfallMm = windowPoints.reduce((sum, p) => sum + p.precipitationMm, 0);
+  // 欠測(null)が1つでもあれば、0mmとして扱わずnullを返す(外挿・穴埋めしない)
+  if (windowPoints.some((p) => p.precipitationMm === null)) return null;
+  const rainfallMm = windowPoints.reduce((sum, p) => sum + (p.precipitationMm as number), 0);
 
   return {
     forecastBaseTime: hourly[0]?.time ?? new Date().toISOString(),

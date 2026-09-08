@@ -1,0 +1,131 @@
+{
+  "generatedAt": "2026-09-08T12:23:36.890Z",
+  "note": "技術確認用のBacktest結果。本実験地点・最終閾値ではない(scripts/research-data/notification-backtest.mjs冒頭コメント参照)。",
+  "experimentConfig": {
+    "configId": "backtest-technical-check-v1",
+    "hourlyRainfallThresholdMm": 10,
+    "accumulated3hThresholdMm": 20,
+    "accumulated6hThresholdMm": 30,
+    "requiredConsecutiveForecastHours": 2,
+    "requiredConsecutiveRuns": 2
+  },
+  "ietdHours": 6,
+  "results": [
+    {
+      "point": {
+        "id": "point-hazard-assumed",
+        "label": "洪水ハザード区域内と仮定",
+        "lat": 34.68,
+        "lng": 135.5,
+        "assumedHazard": "hazard"
+      },
+      "period": {
+        "startDate": "2026-09-01",
+        "endDate": "2026-09-08"
+      },
+      "hoursFetched": 192,
+      "rainfallEvents": 8,
+      "rainyDayCount": 8,
+      "metricsByMethod": {
+        "rain_only": {
+          "notificationCandidatesPerRainyDay": 0.25,
+          "notificationCandidatesPerEvent": 0.25,
+          "duplicateSuppressionRate": 0,
+          "notifiedEventRatio": 0.125,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 2,
+          "totalEvaluations": 186
+        },
+        "hazard_and_rain": {
+          "notificationCandidatesPerRainyDay": 0.25,
+          "notificationCandidatesPerEvent": 0.25,
+          "duplicateSuppressionRate": 0,
+          "notifiedEventRatio": 0.125,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 2,
+          "totalEvaluations": 186
+        },
+        "hazard_rain_state_change": {
+          "notificationCandidatesPerRainyDay": 0.125,
+          "notificationCandidatesPerEvent": 0.125,
+          "duplicateSuppressionRate": 0.5,
+          "notifiedEventRatio": 0.125,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 1,
+          "totalEvaluations": 186
+        },
+        "hazard_rain_state_change_persistence": {
+          "notificationCandidatesPerRainyDay": 0.125,
+          "notificationCandidatesPerEvent": 0.125,
+          "duplicateSuppressionRate": 0.5,
+          "notifiedEventRatio": 0.125,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 1,
+          "totalEvaluations": 186
+        }
+      }
+    },
+    {
+      "point": {
+        "id": "point-outside-assumed",
+        "label": "洪水ハザード区域外と仮定",
+        "lat": 34.75,
+        "lng": 135.42,
+        "assumedHazard": "outside"
+      },
+      "period": {
+        "startDate": "2026-09-01",
+        "endDate": "2026-09-08"
+      },
+      "hoursFetched": 192,
+      "rainfallEvents": 8,
+      "rainyDayCount": 8,
+      "metricsByMethod": {
+        "rain_only": {
+          "notificationCandidatesPerRainyDay": 0.75,
+          "notificationCandidatesPerEvent": 0.75,
+          "duplicateSuppressionRate": null,
+          "notifiedEventRatio": 0.125,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 6,
+          "totalEvaluations": 186
+        },
+        "hazard_and_rain": {
+          "notificationCandidatesPerRainyDay": 0,
+          "notificationCandidatesPerEvent": 0,
+          "duplicateSuppressionRate": null,
+          "notifiedEventRatio": 0,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 0,
+          "totalEvaluations": 186
+        },
+        "hazard_rain_state_change": {
+          "notificationCandidatesPerRainyDay": 0,
+          "notificationCandidatesPerEvent": 0,
+          "duplicateSuppressionRate": null,
+          "notifiedEventRatio": 0,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 0,
+          "totalEvaluations": 186
+        },
+        "hazard_rain_state_change_persistence": {
+          "notificationCandidatesPerRainyDay": 0,
+          "notificationCandidatesPerEvent": 0,
+          "duplicateSuppressionRate": null,
+          "notifiedEventRatio": 0,
+          "dryOrWeakRainNotificationCount": 0,
+          "insufficientDataCount": 0,
+          "totalCandidates": 0,
+          "totalEvaluations": 186
+        }
+      }
+    }
+  ]
+}
