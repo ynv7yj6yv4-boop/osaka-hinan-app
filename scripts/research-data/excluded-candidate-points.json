@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-09-08T14:08:49.001Z",
+  "gitCommit": "ace1777749aa8208b2d207ceca0de70f3dc2725f",
+  "excluded": [
+    {
+      "id": "E2710000853201",
+      "name": "明治東洋医学院専門学校",
+      "address": "大阪府大阪市吹田市西御旅町7-53",
+      "latitude": 34.749031,
+      "longitude": 135.523506,
+      "reason": "ward_extraction_failed_or_ambiguous_municipality",
+      "excludedAt": "2026-09-08T14:08:49.001Z"
+    }
+  ]
+}

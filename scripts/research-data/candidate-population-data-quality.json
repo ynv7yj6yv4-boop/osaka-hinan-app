@@ -1,0 +1,1797 @@
+{
+  "generatedAt": "2026-09-08T14:08:49.001Z",
+  "gitCommit": "ace1777749aa8208b2d207ceca0de70f3dc2725f",
+  "purpose": "candidate population(洪水対応指定緊急避難場所)全数の機械分類のうち、floodStatus=unknownだった地点のデータ品質集計。本実験の主解析(hazard/outside比較)には含めない(docs §7)。",
+  "candidatePopulationCount": 1733,
+  "unknownCount": 223,
+  "unknownRatio": 0.1286785920369302,
+  "unknownReasonBreakdown": {
+    "no_tile": 223
+  },
+  "unknownPoints": [
+    {
+      "id": "E2710000163201",
+      "latitude": 34.66550166,
+      "longitude": 135.4545521,
+      "ward": "港区",
+      "name": "大阪みなとドライビングスクール",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000164201",
+      "latitude": 34.65319497,
+      "longitude": 135.4294235,
+      "ward": "港区",
+      "name": "ホテルシーガルてんぽーざん大阪",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000165201",
+      "latitude": 34.65279995,
+      "longitude": 135.4301602,
+      "ward": "港区",
+      "name": "中谷ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000166201",
+      "latitude": 34.65258116,
+      "longitude": 135.4298084,
+      "ward": "港区",
+      "name": "㈱間口　本社ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000167201",
+      "latitude": 34.65147279,
+      "longitude": 135.4383092,
+      "ward": "港区",
+      "name": "海岸通ハウス",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000168201",
+      "latitude": 34.64807671,
+      "longitude": 135.4423191,
+      "ward": "港区",
+      "name": "日本通運㈱　中央国際物流センター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000169201",
+      "latitude": 34.65662821,
+      "longitude": 135.4440122,
+      "ward": "港区",
+      "name": "港晴小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000170201",
+      "latitude": 34.65573435,
+      "longitude": 135.4438785,
+      "ward": "港区",
+      "name": "市営八幡屋宝町第３住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000171201",
+      "latitude": 34.65560471,
+      "longitude": 135.4422706,
+      "ward": "港区",
+      "name": "市営八幡屋宝町第２住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000172201",
+      "latitude": 34.65495597,
+      "longitude": 135.4435726,
+      "ward": "港区",
+      "name": "市営八幡屋宝町住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000176201",
+      "latitude": 34.65827615,
+      "longitude": 135.4445218,
+      "ward": "港区",
+      "name": "パークシティ朝潮橋",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000177201",
+      "latitude": 34.65770504,
+      "longitude": 135.4432418,
+      "ward": "港区",
+      "name": "ティアラ港",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000179201",
+      "latitude": 34.657878,
+      "longitude": 135.4399393,
+      "ward": "港区",
+      "name": "株式会社メロスビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000183201",
+      "latitude": 34.66025749,
+      "longitude": 135.456796,
+      "ward": "港区",
+      "name": "港南中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000184201",
+      "latitude": 34.658381,
+      "longitude": 135.45141,
+      "ward": "港区",
+      "name": "三先住宅１０号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000185201",
+      "latitude": 34.657484,
+      "longitude": 135.4534,
+      "ward": "港区",
+      "name": "ファミリープラザ朝潮橋",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000187201",
+      "latitude": 34.65884165,
+      "longitude": 135.4531963,
+      "ward": "港区",
+      "name": "三先小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000198201",
+      "latitude": 34.65918434,
+      "longitude": 135.4609363,
+      "ward": "港区",
+      "name": "がんこフードサービス　商品センター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000206201",
+      "latitude": 34.66874596,
+      "longitude": 135.4534268,
+      "ward": "港区",
+      "name": "大塚倉庫㈱　本社ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000207201",
+      "latitude": 34.65756726,
+      "longitude": 135.4485119,
+      "ward": "港区",
+      "name": "港中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000209201",
+      "latitude": 34.65553793,
+      "longitude": 135.4511944,
+      "ward": "港区",
+      "name": "池島小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002918201",
+      "latitude": 34.655813,
+      "longitude": 135.450509,
+      "ward": "港区",
+      "name": "市営池島住宅５号棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002919201",
+      "latitude": 34.655852,
+      "longitude": 135.450976,
+      "ward": "港区",
+      "name": "市営池島住宅６号棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002916201",
+      "latitude": 34.656153,
+      "longitude": 135.449646,
+      "ward": "港区",
+      "name": "市営池島住宅３号棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002917201",
+      "latitude": 34.656554,
+      "longitude": 135.45023,
+      "ward": "港区",
+      "name": "市営池島住宅４号棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000210201",
+      "latitude": 34.655357,
+      "longitude": 135.449198,
+      "ward": "港区",
+      "name": "市営池島住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000211201",
+      "latitude": 34.65512463,
+      "longitude": 135.4504577,
+      "ward": "港区",
+      "name": "市営池島住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000213201",
+      "latitude": 34.65395855,
+      "longitude": 135.4486026,
+      "ward": "港区",
+      "name": "市営池島南住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000214201",
+      "latitude": 34.65301641,
+      "longitude": 135.4361979,
+      "ward": "港区",
+      "name": "築港小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000216201",
+      "latitude": 34.65280651,
+      "longitude": 135.4379339,
+      "ward": "港区",
+      "name": "築港中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000219201",
+      "latitude": 34.6513758,
+      "longitude": 135.4342307,
+      "ward": "港区",
+      "name": "コーシャハイツ港",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000220201",
+      "latitude": 34.65184021,
+      "longitude": 135.4338357,
+      "ward": "港区",
+      "name": "コーシャハイツ港（２号棟）",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710003043201",
+      "latitude": 34.656894,
+      "longitude": 135.431283,
+      "ward": "港区",
+      "name": "天保山船客上屋",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000222201",
+      "latitude": 34.65386492,
+      "longitude": 135.434283,
+      "ward": "港区",
+      "name": "Ｏｓａｋａ　Ｍｅｔｒｏ　大阪港駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000224201",
+      "latitude": 34.65363272,
+      "longitude": 135.4327151,
+      "ward": "港区",
+      "name": "㈱辰巳商會",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000223201",
+      "latitude": 34.653183,
+      "longitude": 135.430675,
+      "ward": "港区",
+      "name": "大阪港湾合同庁舎",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000225201",
+      "latitude": 34.65430096,
+      "longitude": 135.4300847,
+      "ward": "港区",
+      "name": "日本貨物検数協会ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000226201",
+      "latitude": 34.65494255,
+      "longitude": 135.4310462,
+      "ward": "港区",
+      "name": "市営一条通住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000229201",
+      "latitude": 34.6635576,
+      "longitude": 135.4472177,
+      "ward": "港区",
+      "name": "田中小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000231201",
+      "latitude": 34.66189672,
+      "longitude": 135.4457309,
+      "ward": "港区",
+      "name": "港スポーツセンター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000233201",
+      "latitude": 34.66156866,
+      "longitude": 135.448963,
+      "ward": "港区",
+      "name": "Ｏｓａｋａ　Ｍｅｔｒｏ　朝潮橋駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000234201",
+      "latitude": 34.65910767,
+      "longitude": 135.4448242,
+      "ward": "港区",
+      "name": "Ａｓｕｅアリーナ大阪",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000248201",
+      "latitude": 34.67232169,
+      "longitude": 135.4645986,
+      "ward": "港区",
+      "name": "市営波除住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000249201",
+      "latitude": 34.67091931,
+      "longitude": 135.4655372,
+      "ward": "港区",
+      "name": "大阪府立港高等学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000250201",
+      "latitude": 34.66952058,
+      "longitude": 135.4621712,
+      "ward": "港区",
+      "name": "Ｏｓａｋａ　Ｍｅｔｒｏ　弁天町駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000251201",
+      "latitude": 34.67185552,
+      "longitude": 135.4623117,
+      "ward": "港区",
+      "name": "波除小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000252201",
+      "latitude": 34.67373771,
+      "longitude": 135.4637505,
+      "ward": "港区",
+      "name": "Ｈ　Ｒ　Ｃビル　（愛称ＡＩＡＩ（アイアイ）おおさか）",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000253201",
+      "latitude": 34.673695,
+      "longitude": 135.463002,
+      "ward": "港区",
+      "name": "市営波除第２住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000254201",
+      "latitude": 34.67361242,
+      "longitude": 135.4625298,
+      "ward": "港区",
+      "name": "㈱小林産業　本社ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000263201",
+      "latitude": 34.653831,
+      "longitude": 135.445602,
+      "ward": "港区",
+      "name": "八幡屋第２住宅４号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000264201",
+      "latitude": 34.65483232,
+      "longitude": 135.4458613,
+      "ward": "港区",
+      "name": "八幡屋小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000267201",
+      "latitude": 34.65157126,
+      "longitude": 135.4467781,
+      "ward": "港区",
+      "name": "特別養護老人ホーム愛港園",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000268201",
+      "latitude": 34.659817,
+      "longitude": 135.458039,
+      "ward": "港区",
+      "name": "港大阪祭典",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000269201",
+      "latitude": 34.65768263,
+      "longitude": 135.4603558,
+      "ward": "港区",
+      "name": "日本郵便輸送㈱　近畿支社",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000270201",
+      "latitude": 34.65854436,
+      "longitude": 135.4583232,
+      "ward": "港区",
+      "name": "オンワード樫山　大阪支店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000271201",
+      "latitude": 34.65625166,
+      "longitude": 135.4576186,
+      "ward": "港区",
+      "name": "㈱八木製作所",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000278201",
+      "latitude": 34.66870708,
+      "longitude": 135.4556665,
+      "ward": "港区",
+      "name": "弁天小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000281201",
+      "latitude": 34.67112259,
+      "longitude": 135.4560792,
+      "ward": "港区",
+      "name": "介護老人保健施設　港さつき苑",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000287201",
+      "latitude": 34.67209543,
+      "longitude": 135.4553535,
+      "ward": "港区",
+      "name": "㈱山櫻　大阪支店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000288201",
+      "latitude": 34.67172254,
+      "longitude": 135.4566366,
+      "ward": "港区",
+      "name": "㈱梅田精密　本社ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000304201",
+      "latitude": 34.66161608,
+      "longitude": 135.4314742,
+      "ward": "此花区",
+      "name": "桜島北公園",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000307201",
+      "latitude": 34.66089029,
+      "longitude": 135.4282077,
+      "ward": "此花区",
+      "name": "市営桜島住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000313201",
+      "latitude": 34.68060686,
+      "longitude": 135.452324,
+      "ward": "此花区",
+      "name": "春日出小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000315201",
+      "latitude": 34.679036,
+      "longitude": 135.452614,
+      "ward": "此花区",
+      "name": "住友電気工業株式会社大阪製作所社員クラブ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000315202",
+      "latitude": 34.679036,
+      "longitude": 135.452601,
+      "ward": "此花区",
+      "name": "市営春日出中第２住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000316202",
+      "latitude": 34.680136,
+      "longitude": 135.453739,
+      "ward": "此花区",
+      "name": "春日出パークホームズⅡ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000321201",
+      "latitude": 34.673928,
+      "longitude": 135.446744,
+      "ward": "此花区",
+      "name": "キングス夢咲シティ　ひかりの街",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000325201",
+      "latitude": 34.68157804,
+      "longitude": 135.4491327,
+      "ward": "此花区",
+      "name": "市営春日出住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000325202",
+      "latitude": 34.68133541,
+      "longitude": 135.4493633,
+      "ward": "此花区",
+      "name": "市営春日出住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000370201",
+      "latitude": 34.67829288,
+      "longitude": 135.4387673,
+      "ward": "此花区",
+      "name": "市営島屋住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000371201",
+      "latitude": 34.67778949,
+      "longitude": 135.4393172,
+      "ward": "此花区",
+      "name": "島屋小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000372201",
+      "latitude": 34.67547057,
+      "longitude": 135.4431634,
+      "ward": "此花区",
+      "name": "シンプルハートホテル大阪",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000375201",
+      "latitude": 34.676062878462,
+      "longitude": 135.44364227976,
+      "ward": "此花区",
+      "name": "マルハン此花島屋店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000376201",
+      "latitude": 34.67615099,
+      "longitude": 135.4427958,
+      "ward": "此花区",
+      "name": "サーパス此花ネオスタイル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000377201",
+      "latitude": 34.67403854,
+      "longitude": 135.4437354,
+      "ward": "此花区",
+      "name": "ガーデン天使",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000382201",
+      "latitude": 34.67025912,
+      "longitude": 135.4404825,
+      "ward": "此花区",
+      "name": "リバーガーデン　ＥＣＯ　シティアリスの森",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000406201",
+      "latitude": 34.68230698,
+      "longitude": 135.4553263,
+      "ward": "此花区",
+      "name": "梅香小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000409201",
+      "latitude": 34.67180664,
+      "longitude": 135.4303067,
+      "ward": "此花区",
+      "name": "㈱アド・ダイセン　関西メールセンター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000410201",
+      "latitude": 34.66173188,
+      "longitude": 135.4025096,
+      "ward": "此花区",
+      "name": "大阪港舞洲食品流通センター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000515201",
+      "latitude": 34.6156093,
+      "longitude": 135.5075184,
+      "ward": "住吉区",
+      "name": "大領小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000526201",
+      "latitude": 34.61565,
+      "longitude": 135.509075,
+      "ward": "住吉区",
+      "name": "市営長居西第２住宅４号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000532201",
+      "latitude": 34.61933511,
+      "longitude": 135.4957609,
+      "ward": "住吉区",
+      "name": "住吉中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000533201",
+      "latitude": 34.61767004,
+      "longitude": 135.4962996,
+      "ward": "住吉区",
+      "name": "住吉小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000545201",
+      "latitude": 34.619572,
+      "longitude": 135.494585,
+      "ward": "住吉区",
+      "name": "東粉浜小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000569201",
+      "latitude": 34.62140098,
+      "longitude": 135.5044871,
+      "ward": "住吉区",
+      "name": "市営万代住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000613201",
+      "latitude": 34.63736501,
+      "longitude": 135.4130628,
+      "ward": "住之江区",
+      "name": "アジア太平洋トレードセンター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000667201",
+      "latitude": 34.6309014,
+      "longitude": 135.4291254,
+      "ward": "住之江区",
+      "name": "ニュートラム　ポートタウン東駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000668202",
+      "latitude": 34.62822336,
+      "longitude": 135.4298296,
+      "ward": "住之江区",
+      "name": "市営南港中住宅２１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000668201",
+      "latitude": 34.62779960085,
+      "longitude": 135.42894983544,
+      "ward": "住之江区",
+      "name": "市営南港中住宅２２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000670201",
+      "latitude": 34.627713356675,
+      "longitude": 135.42714785092,
+      "ward": "住之江区",
+      "name": "市営南港中住宅３２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000670202",
+      "latitude": 34.62850349,
+      "longitude": 135.4271103,
+      "ward": "住之江区",
+      "name": "市営南港中住宅３１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000672201",
+      "latitude": 34.63091042,
+      "longitude": 135.4227079,
+      "ward": "住之江区",
+      "name": "ニュートラム　ポートタウン西駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000674202",
+      "latitude": 34.62873574,
+      "longitude": 135.4259671,
+      "ward": "住之江区",
+      "name": "咲洲みなみ小中一貫校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000676201",
+      "latitude": 34.63559942,
+      "longitude": 135.4232956,
+      "ward": "住之江区",
+      "name": "南港北中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000677201",
+      "latitude": 34.633727,
+      "longitude": 135.4234168,
+      "ward": "住之江区",
+      "name": "南港光小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000679201",
+      "latitude": 34.63536141,
+      "longitude": 135.4212098,
+      "ward": "住之江区",
+      "name": "南港桜小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000680201",
+      "latitude": 34.635048,
+      "longitude": 135.418967,
+      "ward": "住之江区",
+      "name": "市営南港中住宅４５号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000680205",
+      "latitude": 34.63511,
+      "longitude": 135.419834,
+      "ward": "住之江区",
+      "name": "市営南港中住宅４１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000680204",
+      "latitude": 34.63456,
+      "longitude": 135.419851,
+      "ward": "住之江区",
+      "name": "市営南港中住宅４２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000680203",
+      "latitude": 34.634536,
+      "longitude": 135.418963,
+      "ward": "住之江区",
+      "name": "市営南港中住宅４３号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000680202",
+      "latitude": 34.634801,
+      "longitude": 135.418091,
+      "ward": "住之江区",
+      "name": "市営南港中住宅４４号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000681201",
+      "latitude": 34.63398415,
+      "longitude": 135.4175042,
+      "ward": "住之江区",
+      "name": "ニュートラム　中ふ頭駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000684201",
+      "latitude": 34.61384151,
+      "longitude": 135.4386284,
+      "ward": "住之江区",
+      "name": "ニュートラム　南港東駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000686201",
+      "latitude": 34.62153626,
+      "longitude": 135.4390234,
+      "ward": "住之江区",
+      "name": "大阪南港トラックターミナル管理棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000687201",
+      "latitude": 34.6185261,
+      "longitude": 135.4349925,
+      "ward": "住之江区",
+      "name": "ニュートラム　フェリーターミナル駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710003033201",
+      "latitude": 34.637092,
+      "longitude": 135.41629,
+      "ward": "住之江区",
+      "name": "グランドプリンスホテル大阪ベイ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000689201",
+      "latitude": 34.641807,
+      "longitude": 135.41426,
+      "ward": "住之江区",
+      "name": "シーサイドレジデンスコスモスクエア駅前",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000690201",
+      "latitude": 34.6386985,
+      "longitude": 135.4121299,
+      "ward": "住之江区",
+      "name": "ニュートラム　トレードセンター前駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000691201",
+      "latitude": 34.64212747,
+      "longitude": 135.413087,
+      "ward": "住之江区",
+      "name": "ローレルスクエア大阪ベイタワー",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002946201",
+      "latitude": 34.637613,
+      "longitude": 135.421976,
+      "ward": "住之江区",
+      "name": "インテックス大阪６号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000718201",
+      "latitude": 34.62155377,
+      "longitude": 135.4589393,
+      "ward": "住之江区",
+      "name": "三洋電機株式会社　１棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000939201",
+      "latitude": 34.6805678,
+      "longitude": 135.4919018,
+      "ward": "西区",
+      "name": "明治小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000946201",
+      "latitude": 34.67537865,
+      "longitude": 135.4736219,
+      "ward": "西区",
+      "name": "Ｏｓａｋａ　Ｍｅｔｒｏ中央線　九条駅",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000947201",
+      "latitude": 34.67565763,
+      "longitude": 135.4724052,
+      "ward": "西区",
+      "name": "九条東小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000949201",
+      "latitude": 34.66967877,
+      "longitude": 135.4744166,
+      "ward": "西区",
+      "name": "大阪市高速電気軌道（株）本社ビル３階外部デッキ部通路",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000950201",
+      "latitude": 34.67307478,
+      "longitude": 135.4726965,
+      "ward": "西区",
+      "name": "九条南小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000952201",
+      "latitude": 34.67052704,
+      "longitude": 135.4730884,
+      "ward": "西区",
+      "name": "九条ＭＴビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000955201",
+      "latitude": 34.67687685,
+      "longitude": 135.4682933,
+      "ward": "西区",
+      "name": "九条北小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000957201",
+      "latitude": 34.6865105,
+      "longitude": 135.4895166,
+      "ward": "西区",
+      "name": "花乃井中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000958201",
+      "latitude": 34.68455755,
+      "longitude": 135.4861085,
+      "ward": "西区",
+      "name": "グランドメゾン江戸堀西公園",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000961201",
+      "latitude": 34.67772319,
+      "longitude": 135.4943351,
+      "ward": "西区",
+      "name": "忠兵衛新町ハウス・　忠兵衛公園ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000962201",
+      "latitude": 34.67742382,
+      "longitude": 135.4944831,
+      "ward": "西区",
+      "name": "新町忠兵衛ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000964201",
+      "latitude": 34.67639305,
+      "longitude": 135.4919517,
+      "ward": "西区",
+      "name": "ライフ西大橋店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000966201",
+      "latitude": 34.67611758,
+      "longitude": 135.4892203,
+      "ward": "西区",
+      "name": "ＩＮＳＯＵビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000967201",
+      "latitude": 34.67644861,
+      "longitude": 135.4843693,
+      "ward": "西区",
+      "name": "カキモトビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000971201",
+      "latitude": 34.67152652,
+      "longitude": 135.4789545,
+      "ward": "西区",
+      "name": "西中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000972201",
+      "latitude": 34.67163802,
+      "longitude": 135.4792828,
+      "ward": "西区",
+      "name": "エクセランス九条公園",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000970201",
+      "latitude": 34.67035674,
+      "longitude": 135.4779303,
+      "ward": "西区",
+      "name": "イオンモール大阪ドームシティ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000973201",
+      "latitude": 34.66929788,
+      "longitude": 135.4773134,
+      "ward": "西区",
+      "name": "京セラドーム大阪・周辺デッキ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000976201",
+      "latitude": 34.68150716,
+      "longitude": 135.4815944,
+      "ward": "西区",
+      "name": "本田小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000977201",
+      "latitude": 34.67998145,
+      "longitude": 135.4783081,
+      "ward": "西区",
+      "name": "大喜多㈱",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000989201",
+      "latitude": 34.67439463,
+      "longitude": 135.4903174,
+      "ward": "西区",
+      "name": "堀江小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000998201",
+      "latitude": 34.6802063,
+      "longitude": 135.4975006,
+      "ward": "西区",
+      "name": "Ｊ国際学院　校舎",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710000999201",
+      "latitude": 34.67956073,
+      "longitude": 135.4966101,
+      "ward": "西区",
+      "name": "花王㈱　大阪事業場",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001000201",
+      "latitude": 34.68014405,
+      "longitude": 135.4958555,
+      "ward": "西区",
+      "name": "和泉防災㈱",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001001201",
+      "latitude": 34.679152235687,
+      "longitude": 135.49469603254,
+      "ward": "西区",
+      "name": "サンコーインダストリー㈱　新館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001003201",
+      "latitude": 34.67974057,
+      "longitude": 135.4898845,
+      "ward": "西区",
+      "name": "山善　第３ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001004201",
+      "latitude": 34.67862011,
+      "longitude": 135.4899756,
+      "ward": "西区",
+      "name": "ルイシャトレ本町西",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001007201",
+      "latitude": 34.67824746,
+      "longitude": 135.485314,
+      "ward": "西区",
+      "name": "住電商事㈱",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001011201",
+      "latitude": 34.684151,
+      "longitude": 135.49346,
+      "ward": "西区",
+      "name": "靱パークサイドコーポ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001012201",
+      "latitude": 34.684651,
+      "longitude": 135.497403,
+      "ward": "西区",
+      "name": "パークサイド本町",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001013201",
+      "latitude": 34.682931,
+      "longitude": 135.486652,
+      "ward": "西区",
+      "name": "ショウエイ靱",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001058201",
+      "latitude": 34.63698811,
+      "longitude": 135.5016995,
+      "ward": "西成区",
+      "name": "天下茶屋小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002936201",
+      "latitude": 34.647909,
+      "longitude": 135.500565,
+      "ward": "西成区",
+      "name": "市営萩之茶屋北住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001133201",
+      "latitude": 34.647517,
+      "longitude": 135.499898,
+      "ward": "西成区",
+      "name": "市営萩之茶屋北住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001222201",
+      "latitude": 34.70121985,
+      "longitude": 135.4270244,
+      "ward": "西淀川区",
+      "name": "クオレ西淀川",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001225201",
+      "latitude": 34.69783594,
+      "longitude": 135.4117755,
+      "ward": "西淀川区",
+      "name": "日本通運㈱　北港ロジスティックセンター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710003045201",
+      "latitude": 34.700325,
+      "longitude": 135.416204,
+      "ward": "西淀川区",
+      "name": "大和物流センター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001233201",
+      "latitude": 34.7119038,
+      "longitude": 135.4403906,
+      "ward": "西淀川区",
+      "name": "市営佃第２住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001297201",
+      "latitude": 34.64335495,
+      "longitude": 135.4728377,
+      "ward": "大正区",
+      "name": "市営小林住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001298201",
+      "latitude": 34.664915,
+      "longitude": 135.477799,
+      "ward": "大正区",
+      "name": "ほくとクリニック病院",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001299201",
+      "latitude": 34.66500241,
+      "longitude": 135.4770766,
+      "ward": "大正区",
+      "name": "三軒家西小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001300201",
+      "latitude": 34.666836,
+      "longitude": 135.477794,
+      "ward": "大正区",
+      "name": "大正ゆめの樹保育園",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001306201",
+      "latitude": 34.66221036,
+      "longitude": 135.4773858,
+      "ward": "大正区",
+      "name": "大正東中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001307201",
+      "latitude": 34.64623132,
+      "longitude": 135.4685048,
+      "ward": "大正区",
+      "name": "大正区ふれあい福祉センター",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002921201",
+      "latitude": 34.646029,
+      "longitude": 135.47695,
+      "ward": "大正区",
+      "name": "株式会社藤井組",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001309201",
+      "latitude": 34.64651979,
+      "longitude": 135.4738395,
+      "ward": "大正区",
+      "name": "小林小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001311201",
+      "latitude": 34.643136,
+      "longitude": 135.475924,
+      "ward": "大正区",
+      "name": "介護老人保健施設　愛の里",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001312201",
+      "latitude": 34.643152,
+      "longitude": 135.476318,
+      "ward": "大正区",
+      "name": "特別養護老人ホーム　悠の里",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001313201",
+      "latitude": 34.64406050289,
+      "longitude": 135.4717336,
+      "ward": "大正区",
+      "name": "大正中央中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001314201",
+      "latitude": 34.64707108,
+      "longitude": 135.4722418,
+      "ward": "大正区",
+      "name": "大正スポーツセンター・大正屋内プール（アゼリア大正）",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001316201",
+      "latitude": 34.65394747,
+      "longitude": 135.4747946,
+      "ward": "大正区",
+      "name": "泉尾東小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001317201",
+      "latitude": 34.65086144,
+      "longitude": 135.4721649,
+      "ward": "大正区",
+      "name": "大正会館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002960201",
+      "latitude": 34.66304,
+      "longitude": 135.472841,
+      "ward": "大正区",
+      "name": "日商岩井泉尾マンション１号棟",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002920201",
+      "latitude": 34.660763,
+      "longitude": 135.47435,
+      "ward": "大正区",
+      "name": "大正くすのきクリニック",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001322201",
+      "latitude": 34.65897729,
+      "longitude": 135.4708553,
+      "ward": "大正区",
+      "name": "大正白稜高等学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001324201",
+      "latitude": 34.659494647752,
+      "longitude": 135.46943147116,
+      "ward": "大正区",
+      "name": "中泉尾小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001327201",
+      "latitude": 34.65475652,
+      "longitude": 135.4686207,
+      "ward": "大正区",
+      "name": "泉尾工業高等学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001328201",
+      "latitude": 34.65448569,
+      "longitude": 135.4683069,
+      "ward": "大正区",
+      "name": "北恩加島小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002940201",
+      "latitude": 34.630034,
+      "longitude": 135.46612,
+      "ward": "大正区",
+      "name": "ロジポート大阪大正",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001331201",
+      "latitude": 34.63628642,
+      "longitude": 135.4586299,
+      "ward": "大正区",
+      "name": "市営鶴町第８住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001336201",
+      "latitude": 34.63689637,
+      "longitude": 135.4528658,
+      "ward": "大正区",
+      "name": "市営鶴町第９住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001337201",
+      "latitude": 34.63939478,
+      "longitude": 135.4563769,
+      "ward": "大正区",
+      "name": "鶴町小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001339201",
+      "latitude": 34.642142,
+      "longitude": 135.453744,
+      "ward": "大正区",
+      "name": "市営鶴町第３住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001340201",
+      "latitude": 34.642519,
+      "longitude": 135.453679,
+      "ward": "大正区",
+      "name": "市営鶴町第３住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001341201",
+      "latitude": 34.642921,
+      "longitude": 135.453666,
+      "ward": "大正区",
+      "name": "市営鶴町第４住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001342201",
+      "latitude": 34.64340519,
+      "longitude": 135.4538908,
+      "ward": "大正区",
+      "name": "大阪シティバス鶴町車庫",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001343201",
+      "latitude": 34.643824,
+      "longitude": 135.456333,
+      "ward": "大正区",
+      "name": "市営鶴町住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001344201",
+      "latitude": 34.64453,
+      "longitude": 135.455773,
+      "ward": "大正区",
+      "name": "市営鶴町住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001346201",
+      "latitude": 34.643108,
+      "longitude": 135.45503,
+      "ward": "大正区",
+      "name": "つるまち海の風保育園",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001349201",
+      "latitude": 34.63616511,
+      "longitude": 135.469879,
+      "ward": "大正区",
+      "name": "南恩加島小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001350201",
+      "latitude": 34.639771,
+      "longitude": 135.468868,
+      "ward": "大正区",
+      "name": "介護付有料老人ホーム　スローライフおかじま",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001352201",
+      "latitude": 34.6362095,
+      "longitude": 135.4650007,
+      "ward": "大正区",
+      "name": "大正西中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002984201",
+      "latitude": 34.637653,
+      "longitude": 135.467895,
+      "ward": "大正区",
+      "name": "三栄建設鉄構事業本部新事務所",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002938201",
+      "latitude": 34.640649,
+      "longitude": 135.4772,
+      "ward": "大正区",
+      "name": "ウエスト大正（駐車場）",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001354201",
+      "latitude": 34.64084889,
+      "longitude": 135.4740387,
+      "ward": "大正区",
+      "name": "平尾小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001356201",
+      "latitude": 34.642122,
+      "longitude": 135.473656,
+      "ward": "大正区",
+      "name": "小林住宅５号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001357201",
+      "latitude": 34.64289155,
+      "longitude": 135.4727572,
+      "ward": "大正区",
+      "name": "市営小林住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001358201",
+      "latitude": 34.651858,
+      "longitude": 135.46536,
+      "ward": "大正区",
+      "name": "北村住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001361201",
+      "latitude": 34.65000799,
+      "longitude": 135.4691346,
+      "ward": "大正区",
+      "name": "大正北中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001368201",
+      "latitude": 34.68043,
+      "longitude": 135.507756,
+      "ward": "中央区",
+      "name": "ライフ堺筋本町店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001392201",
+      "latitude": 34.68000058861,
+      "longitude": 135.53115918784,
+      "ward": "中央区",
+      "name": "ライフセントラルスクエア森ノ宮店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001408201",
+      "latitude": 34.67688969,
+      "longitude": 135.4991176,
+      "ward": "中央区",
+      "name": "南船場心斎橋ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001416201",
+      "latitude": 34.684554412945,
+      "longitude": 135.49935324656,
+      "ward": "中央区",
+      "name": "相愛中学校・高等学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710001418201",
+      "latitude": 34.68453154,
+      "longitude": 135.4982089,
+      "ward": "中央区",
+      "name": "愛日会館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002447201",
+      "latitude": 34.692522,
+      "longitude": 135.515399,
+      "ward": "北区",
+      "name": "Ｍ’Ｓ　ＴＥＭＭＡ",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002453201",
+      "latitude": 34.69765105,
+      "longitude": 135.5128948,
+      "ward": "北区",
+      "name": "堀川小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002699201",
+      "latitude": 34.65427462,
+      "longitude": 135.5019599,
+      "ward": "浪速区",
+      "name": "大阪市清掃連合協同組合",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002703201",
+      "latitude": 34.6515828,
+      "longitude": 135.5065053,
+      "ward": "浪速区",
+      "name": "東横ＩＮＮ大阪通天閣前",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002941201",
+      "latitude": 34.649719,
+      "longitude": 135.505548,
+      "ward": "浪速区",
+      "name": "スパワールド　ホテル＆リゾート",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002704201",
+      "latitude": 34.649736,
+      "longitude": 135.504594,
+      "ward": "浪速区",
+      "name": "マルハン新世界店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002719201",
+      "latitude": 34.653822856709,
+      "longitude": 135.5000313135,
+      "ward": "浪速区",
+      "name": "木津中学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002730201",
+      "latitude": 34.65992727,
+      "longitude": 135.5021502,
+      "ward": "浪速区",
+      "name": "㈱ヤマダ電機ＬＡＢＩ１なんば駐車場",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002738201",
+      "latitude": 34.65914784,
+      "longitude": 135.5063695,
+      "ward": "浪速区",
+      "name": "永和信用金庫",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002739201",
+      "latitude": 34.65975222,
+      "longitude": 135.5063735,
+      "ward": "浪速区",
+      "name": "岡本無線電機㈱　本社ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710003029201",
+      "latitude": 34.658187,
+      "longitude": 135.506916,
+      "ward": "浪速区",
+      "name": "ジョーシン　日本橋ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002740201",
+      "latitude": 34.65680025,
+      "longitude": 135.5049979,
+      "ward": "浪速区",
+      "name": "市営日本橋住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002741202",
+      "latitude": 34.65777028,
+      "longitude": 135.5043524,
+      "ward": "浪速区",
+      "name": "市営日本橋住宅４号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002741201",
+      "latitude": 34.65837039,
+      "longitude": 135.5044436,
+      "ward": "浪速区",
+      "name": "市営日本橋住宅５号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002743201",
+      "latitude": 34.65764839,
+      "longitude": 135.506736,
+      "ward": "浪速区",
+      "name": "市営日東住宅３号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002742202",
+      "latitude": 34.65649137,
+      "longitude": 135.5045312,
+      "ward": "浪速区",
+      "name": "市営日本橋住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002742201",
+      "latitude": 34.65710472,
+      "longitude": 135.5045312,
+      "ward": "浪速区",
+      "name": "市営日本橋住宅３号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710003030201",
+      "latitude": 34.658399,
+      "longitude": 135.506229,
+      "ward": "浪速区",
+      "name": "ジョーシン　日本橋店",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002745201",
+      "latitude": 34.65939471,
+      "longitude": 135.5037127,
+      "ward": "浪速区",
+      "name": "ジョーシン本社ビル",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002746201",
+      "latitude": 34.65856385,
+      "longitude": 135.5040035,
+      "ward": "浪速区",
+      "name": "日本橋小中一貫校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002747201",
+      "latitude": 34.65725742,
+      "longitude": 135.5028632,
+      "ward": "浪速区",
+      "name": "市営日本橋西住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002748201",
+      "latitude": 34.65610975,
+      "longitude": 135.5036008,
+      "ward": "浪速区",
+      "name": "市営広田住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002749201",
+      "latitude": 34.65818794,
+      "longitude": 135.508521,
+      "ward": "浪速区",
+      "name": "日東小学校",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002751201",
+      "latitude": 34.65738647,
+      "longitude": 135.5074661,
+      "ward": "浪速区",
+      "name": "市営日東住宅１号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002752201",
+      "latitude": 34.65697099,
+      "longitude": 135.5081509,
+      "ward": "浪速区",
+      "name": "市営日東住宅２号館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002757201",
+      "latitude": 34.65854027,
+      "longitude": 135.5009092,
+      "ward": "浪速区",
+      "name": "㈱クボタ　本社ビル、第二ビル、体育館",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002759201",
+      "latitude": 34.65727664,
+      "longitude": 135.5000144,
+      "ward": "浪速区",
+      "name": "大阪木津地方卸売市場",
+      "floodStatusReason": "no_tile"
+    },
+    {
+      "id": "E2710002760201",
+      "latitude": 34.65599277,
+      "longitude": 135.5001826,
+      "ward": "浪速区",
+      "name": "市営敷津東住宅１号館",
+      "floodStatusReason": "no_tile"
+    }
+  ]
+}
