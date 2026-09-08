@@ -33,6 +33,7 @@ type RawCaptureResult = {
   pointId: string;
   latitude: number;
   longitude: number;
+  technicalVerificationOnly: boolean;
   pixel?: HazardPixelStatus;
   captureFailed?: boolean;
   failureReason?: FloodStatusReason;
@@ -72,7 +73,12 @@ export async function POST(request: Request) {
 
   // PART G: 取得に失敗した地点も黙って除外せず、必ず1件のレコードを残す。
   const results = (points as RawCaptureResult[]).map((raw) => {
-    const pointRef = { pointId: raw.pointId, latitude: raw.latitude, longitude: raw.longitude };
+    const pointRef = {
+      pointId: raw.pointId,
+      latitude: raw.latitude,
+      longitude: raw.longitude,
+      technicalVerificationOnly: raw.technicalVerificationOnly,
+    };
     if (raw.captureFailed || !raw.pixel) {
       return toCaptureFailurePointResult(pointRef, meta, raw.failureReason ?? "browser_error");
     }

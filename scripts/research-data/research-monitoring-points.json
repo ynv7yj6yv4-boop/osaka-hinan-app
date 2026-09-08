@@ -1,7 +1,7 @@
 {
   "metadata": {
     "experimentPointsFinalized": false,
-    "notes": "要件定義書3 §4・PART C・PART P: 本実験地点はまだ人間側で決定していない。ここに含まれる地点は、staticFloodHazard方式Bのパイプライン(地点入力→既存ブラウザ洪水判定→固定JSON→Notification Backtest)が正しく動くことを確認するための技術確認用地点のみであり、卒論本実験結果には使用しない。座標はdata/README.md「研究用テスト地点との違い」に記載の、研究者が大阪市内であることを事前確認済みの地点(scripts/route-sampling-experiment.mjsのL1・L2・L5と同一)を流用している。selectionGroup/selectionReasonはまだ正式な地点選定分類ではないため、意味のある分類名(河川沿い・都心・低地等)をここで確定しない(要件定義書3 §5・PART D)。"
+    "notes": "要件定義書3 §4・PART C・PART P: 本実験地点はまだ人間側で決定していない。ここに含まれる地点は、staticFloodHazard方式Bのパイプライン(地点入力→既存ブラウザ洪水判定→固定JSON→Notification Backtest)が正しく動くことを確認するための技術確認用地点のみであり、卒論本実験結果には使用しない(全地点technicalVerificationOnly=true)。P001〜P003の座標はdata/README.md「研究用テスト地点との違い」に記載の、研究者が大阪市内であることを事前確認済みの地点(scripts/route-sampling-experiment.mjsのL1・L2・L5と同一)を流用。P004は、2回目の技術確認(要件定義書3: hazard状態でのパイプライン動作確認)のために追加した地点。既存の技術確認済みhazard地点が無かったため、西淀川区・此花区・大正区・東淀川区・住之江区の5候補(いずれも大阪市内の低地・河川沿い)を既存ブラウザ判定で試し、floodStatus=hazardとなった3候補(西淀川区・東淀川区・住之江区)のうち西淀川区の地点を採用した(2026-09-08実施、探索の詳細はコミット履歴参照)。P004は本実験地点ではなく、地点選定ルールとしての正式な意味も持たない(technicalVerificationOnly=true)。"
   },
   "points": [
     {
@@ -11,7 +11,8 @@
       "selectionGroup": "technical_verification",
       "selectionReason": "パイプライン動作確認用。大阪市内であることを事前確認済みの既存座標(route-sampling-experiment.mjs L1)を流用。本実験地点ではない。",
       "selectedBeforeExperiment": false,
-      "selectedAt": "2026-09-08T13:14:08.000Z"
+      "selectedAt": "2026-09-08T13:14:08.000Z",
+      "technicalVerificationOnly": true
     },
     {
       "pointId": "P002",
@@ -20,7 +21,8 @@
       "selectionGroup": "technical_verification",
       "selectionReason": "パイプライン動作確認用。大阪市内であることを事前確認済みの既存座標(route-sampling-experiment.mjs L2)を流用。本実験地点ではない。",
       "selectedBeforeExperiment": false,
-      "selectedAt": "2026-09-08T13:14:08.000Z"
+      "selectedAt": "2026-09-08T13:14:08.000Z",
+      "technicalVerificationOnly": true
     },
     {
       "pointId": "P003",
@@ -29,7 +31,18 @@
       "selectionGroup": "technical_verification",
       "selectionReason": "パイプライン動作確認用。大阪市内であることを事前確認済みの既存座標(route-sampling-experiment.mjs L5)を流用。本実験地点ではない。",
       "selectedBeforeExperiment": false,
-      "selectedAt": "2026-09-08T13:14:08.000Z"
+      "selectedAt": "2026-09-08T13:14:08.000Z",
+      "technicalVerificationOnly": true
+    },
+    {
+      "pointId": "P004",
+      "latitude": 34.7106,
+      "longitude": 135.4529,
+      "selectionGroup": "technical_verification_hazard_check",
+      "selectionReason": "2回目技術確認: 技術確認用地点にfloodStatus=hazardの実例が含まれていなかったため追加(要件定義書3の指示)。西淀川区、淀川沿い低地。既存ブラウザ判定でhazard(想定浸水深0.5〜3.0m)を実際に確認済み(2026-09-08)。本実験地点ではなく、地点選定ルールとしての意味も持たない。",
+      "selectedBeforeExperiment": false,
+      "selectedAt": "2026-09-08T14:00:00.000Z",
+      "technicalVerificationOnly": true
     }
   ]
 }

@@ -564,17 +564,42 @@ Backtest）専用という役割分担になった。そのため、
 
 ### 動作確認結果（技術確認・2026-09-08時点）
 
-`research-monitoring-points.json`の技術確認用3地点（P001〜P003。
-いずれも大阪市内であることを事前確認済みの既存座標を流用。本実験地点ではない）
-について、実際にブラウザでHazard Captureを実行したところ、
-P001・P003は`outside`、P002は`unknown`（`no_tile`）という結果になった
-（大阪市内でも洪水浸水想定区域データが提供されていない、または
-その地点のタイルが透明である場所が実際にあることを示している。
+`research-monitoring-points.json`の技術確認用地点（P001〜P004。全地点
+`technicalVerificationOnly: true`。本実験地点ではない）について、実際に
+ブラウザでHazard Captureを実行したところ、P001・P003は`outside`、
+P002は`unknown`（`no_tile`）、P004は`hazard`（想定浸水深0.5〜3.0m）
+という結果になった（大阪市内でも洪水浸水想定区域データが提供されていない、
+または該当ピクセルが透明である場所が実際にあることを示している。
 「大阪市＝全域ハザードタイル提供済み」ではないことに注意）。
 続けて`notification-backtest-static-hazard.mjs`でSingle Runs APIと
 接続したところ、Method1（Rain Only）はhazard状態に関わらず降雨条件のみで
 候補判定され、Method2〜4はP001・P003（outside）・P002（unknown/
-insufficient_data）のいずれでも一度も候補にならなかった（意図どおり。
-「outside/unknownを安全側の候補除外として扱うが、安全とは断定しない」
-という設計が実データでも機能することを確認できた）。この結果は技術確認用
-であり、卒論本実験結果ではない。
+insufficient_data）のいずれでも一度も候補にならず、P004（hazard）では
+降雨条件が成立したrunでMethod2・3が候補になり（Method4は継続性未確認の
+ため候補にならず）、hazard/outside/unknownの3状態すべてで
+「地点→既存hazard判定→固定JSON→Single Runs→Method1〜4」が一気通貫で
+動作することを実データで確認できた。この結果は技術確認用であり、
+卒論本実験結果ではない。
+
+### P004 technical verification selection（hazard実地点の技術確認選定経緯）
+
+上記のP001〜P003には`floodStatus=hazard`となる実地点が含まれていなかった
+ため、hazard状態でもパイプライン全体（既存ブラウザ判定→固定JSON→
+Single Runs→Method2〜4）が正しく動作するかを確認する目的で、P004を追加した。
+
+**これは本実験地点の選定ではない。** 大阪市内の低地・河川沿いの区
+（大正区・此花区・西淀川区・東淀川区・住之江区）から1地点ずつ、
+既存ブラウザ判定でfloodStatus=hazardになりやすいと見込まれる座標を仮に選び、
+実際に`classifyHazardPixel()`（既存・検証済みロジック、判定ロジックの変更なし）
+で判定した。5候補中3候補（西淀川区・東淀川区・住之江区）でhazardを確認でき、
+そのうち西淀川区の地点をP004として採用した（大正区・此花区は
+`unknown`/`no_tile`だった）。
+
+選定基準は「hazardになる地点を1つ見つけること」のみであり、
+「候補地点のうちどれが卒論の結果として都合が良いか」といった基準は
+一切用いていない。本実験の地点数・地点選定ルールにはP004を含めない
+（`research-monitoring-points.json`の`technicalVerificationOnly: true`、
+`selectionGroup: "technical_verification_hazard_check"`で区別している）。
+本実験開始時には、人間側が事前に決定した研究地点リストに対して、
+`technicalVerificationOnly: false`を明示的に設定した上で固定JSONを
+再生成する。

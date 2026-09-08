@@ -100,6 +100,7 @@ export default function StaticFloodHazardCapturePage() {
             pointId: r.pointId,
             latitude: r.latitude,
             longitude: r.longitude,
+            technicalVerificationOnly: r.technicalVerificationOnly,
             pixel:
               r.floodStatus === "hazard"
                 ? { status: "hazard", rank: r.depthRank }

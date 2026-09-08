@@ -11,7 +11,7 @@ import {
   toBacktestHazardStatusLabel,
 } from "./staticFloodHazardCapture.ts";
 
-const POINT = { pointId: "P001", latitude: 34.68, longitude: 135.5 };
+const POINT = { pointId: "P001", latitude: 34.68, longitude: 135.5, technicalVerificationOnly: true };
 const META = { evaluatedAt: "2026-09-08T00:00:00.000Z", systemVersion: "0.1.0", gitCommit: "abc1234" };
 
 // 1. hazard地点保存
@@ -107,6 +107,19 @@ test("同じ入力からは常に同じ構造のdatasetを再生成できる(再
   const first = buildStaticFloodHazardDataset(points, provenance);
   const second = buildStaticFloodHazardDataset(points, provenance);
   assert.deepEqual(first, second);
+});
+
+// 技術確認2回目: technicalVerificationOnlyが入力から結果へそのまま引き継がれる
+test("technicalVerificationOnlyは入力からそのまま保存結果へ引き継がれる(本実験データと区別するため)", () => {
+  const hazardResult = toStaticFloodHazardPointResult(POINT, { status: "hazard", rank: 1 }, META);
+  assert.equal(hazardResult.technicalVerificationOnly, true);
+
+  const nonTechnicalPoint = { ...POINT, technicalVerificationOnly: false };
+  const realResult = toStaticFloodHazardPointResult(nonTechnicalPoint, { status: "outside" }, META);
+  assert.equal(realResult.technicalVerificationOnly, false);
+
+  const failureResult = toCaptureFailurePointResult(POINT, META);
+  assert.equal(failureResult.technicalVerificationOnly, true);
 });
 
 // 11. unknown → insufficient_data(Backtestレポート表示用ラベル)

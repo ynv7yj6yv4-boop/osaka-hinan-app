@@ -40,6 +40,10 @@ export const HAZARD_DATA_SOURCE =
  * 「都心」「低地」「高地」等の意味のある分類は、まだ人間側で正式決定していない。
  * 本実験地点が決まるまでは、パイプライン確認用であることが分かる中立的な値
  * （例: "technical_verification"）のみを使うこと。
+ *
+ * 【技術確認2回目・追記】technicalVerificationOnly: trueの地点は、
+ * パイプライン動作確認専用であり、本実験の地点数・地点選定には一切含めない
+ * （本実験地点が決まっていない現段階では、実質すべての地点がtrueになる）。
  */
 export type ResearchMonitoringPoint = {
   pointId: string;
@@ -50,6 +54,8 @@ export type ResearchMonitoringPoint = {
   /** 結果を見てから選んだ地点でないことの記録（恣意性排除のため） */
   selectedBeforeExperiment: boolean;
   selectedAt: string;
+  /** trueの間、この地点は本実験データとして一切使用しない（技術確認専用）。 */
+  technicalVerificationOnly: boolean;
 };
 
 export type ResearchMonitoringPointsFile = {
@@ -89,6 +95,8 @@ export type StaticFloodHazardPointResult = {
   ruleVersion: string;
   systemVersion: string;
   gitCommit: string;
+  /** 入力(ResearchMonitoringPoint)のtechnicalVerificationOnlyをそのまま引き継ぐ。 */
+  technicalVerificationOnly: boolean;
 };
 
 const DEPTH_LABELS: Record<DepthRank, string | null> = {
@@ -117,7 +125,10 @@ export type CaptureMeta = {
  * いずれもこの関数では起こり得ない（switch的にunknownはunknownのまま返す）。
  */
 export function toStaticFloodHazardPointResult(
-  point: Pick<ResearchMonitoringPoint, "pointId" | "latitude" | "longitude">,
+  point: Pick<
+    ResearchMonitoringPoint,
+    "pointId" | "latitude" | "longitude" | "technicalVerificationOnly"
+  >,
   pixel: HazardPixelStatus,
   meta: CaptureMeta
 ): StaticFloodHazardPointResult {
@@ -125,6 +136,7 @@ export function toStaticFloodHazardPointResult(
     pointId: point.pointId,
     latitude: point.latitude,
     longitude: point.longitude,
+    technicalVerificationOnly: point.technicalVerificationOnly,
     dataSource: HAZARD_DATA_SOURCE,
     evaluatedAt: meta.evaluatedAt,
     ruleVersion: RULE_VERSION,
@@ -169,7 +181,10 @@ export function toStaticFloodHazardPointResult(
  * レコードを組み立てる（PART G）。この場合も地点を結果から消さず、unknownとして残す。
  */
 export function toCaptureFailurePointResult(
-  point: Pick<ResearchMonitoringPoint, "pointId" | "latitude" | "longitude">,
+  point: Pick<
+    ResearchMonitoringPoint,
+    "pointId" | "latitude" | "longitude" | "technicalVerificationOnly"
+  >,
   meta: CaptureMeta,
   reason: FloodStatusReason = "browser_error"
 ): StaticFloodHazardPointResult {
@@ -177,6 +192,7 @@ export function toCaptureFailurePointResult(
     pointId: point.pointId,
     latitude: point.latitude,
     longitude: point.longitude,
+    technicalVerificationOnly: point.technicalVerificationOnly,
     floodStatus: "unknown",
     floodStatusReason: reason,
     depthRank: null,

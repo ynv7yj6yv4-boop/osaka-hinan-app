@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T13:19:28.002Z",
+  "generatedAt": "2026-09-08T13:31:34.411Z",
   "note": "技術確認用のBacktest結果(要件定義書3 §71 PART O)。地点→既存hazard判定(固定JSON)→Single Runs Forecast→Method1〜4が一気通貫で動くことの確認が目的であり、卒論本実験結果ではない。本実験地点・期間・閾値は未決定(§68・69・59)。",
   "experimentConfig": {
     "configId": "static-hazard-single-runs-technical-check-v1",
@@ -11,8 +11,8 @@
   },
   "staticFloodHazardSource": {
     "path": "scripts/research-data/static-flood-hazard-points.json",
-    "generatedAt": "2026-09-08T13:18:21.097Z",
-    "gitCommit": "c8d33296888bdc174d24fd8e5b77226abee91074",
+    "generatedAt": "2026-09-08T13:31:06.073Z",
+    "gitCommit": "50bc3d84871b22edb184ced1eaabd1d6fcc07a86",
     "ruleVersion": "phase5a3-static-only-v2"
   },
   "runTimesUsed": [
@@ -25,6 +25,7 @@
       "pointId": "P001",
       "latitude": 34.6937,
       "longitude": 135.5023,
+      "technicalVerificationOnly": true,
       "staticFloodHazardStatus": "outside",
       "staticFloodDepthRank": 0,
       "runsAttempted": 3,
@@ -248,6 +249,7 @@
       "pointId": "P002",
       "latitude": 34.6683,
       "longitude": 135.4429,
+      "technicalVerificationOnly": true,
       "staticFloodHazardStatus": "insufficient_data",
       "staticFloodDepthRank": null,
       "runsAttempted": 3,
@@ -471,6 +473,7 @@
       "pointId": "P003",
       "latitude": 34.6127,
       "longitude": 135.5138,
+      "technicalVerificationOnly": true,
       "staticFloodHazardStatus": "outside",
       "staticFloodDepthRank": 0,
       "runsAttempted": 3,
@@ -686,6 +689,230 @@
             "newInternalState": "normal",
             "isCandidate": false,
             "reason": "洪水ハザード区域外(絶対安全とは断定しないが、原則Push対象外)"
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "P004",
+      "latitude": 34.7106,
+      "longitude": 135.4529,
+      "technicalVerificationOnly": true,
+      "staticFloodHazardStatus": "hazard",
+      "staticFloodDepthRank": 2,
+      "runsAttempted": 3,
+      "runsOk": 3,
+      "perMethodTrace": {
+        "rain_only": [
+          {
+            "runInitialisationTime": "2026-09-08T00:00",
+            "hourlyRainfallMm": [
+              3,
+              19.1,
+              9,
+              0.1,
+              0.5,
+              1.2
+            ],
+            "rainCondition": "met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": true,
+            "reason": "降雨条件のみで判定(比較対照。本番候補ではない)"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T03:00",
+            "hourlyRainfallMm": [
+              0.9,
+              1.8,
+              2.8,
+              0.3,
+              0.2,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "降雨条件を満たさない"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T06:00",
+            "hourlyRainfallMm": [
+              0.5,
+              1.1,
+              0.7,
+              0,
+              0,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "降雨条件を満たさない"
+          }
+        ],
+        "hazard_and_rain": [
+          {
+            "runInitialisationTime": "2026-09-08T00:00",
+            "hourlyRainfallMm": [
+              3,
+              19.1,
+              9,
+              0.1,
+              0.5,
+              1.2
+            ],
+            "rainCondition": "met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "candidate_unconfirmed",
+            "isCandidate": true,
+            "reason": "洪水ハザード区域内 かつ 降雨条件成立(状態変化は考慮しない)"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T03:00",
+            "hourlyRainfallMm": [
+              0.9,
+              1.8,
+              2.8,
+              0.3,
+              0.2,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "降雨条件を満たさない"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T06:00",
+            "hourlyRainfallMm": [
+              0.5,
+              1.1,
+              0.7,
+              0,
+              0,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "降雨条件を満たさない"
+          }
+        ],
+        "hazard_rain_state_change": [
+          {
+            "runInitialisationTime": "2026-09-08T00:00",
+            "hourlyRainfallMm": [
+              3,
+              19.1,
+              9,
+              0.1,
+              0.5,
+              1.2
+            ],
+            "rainCondition": "met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "candidate_unconfirmed",
+            "isCandidate": true,
+            "reason": "状態がnormalから上昇(新規候補)"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T03:00",
+            "hourlyRainfallMm": [
+              0.9,
+              1.8,
+              2.8,
+              0.3,
+              0.2,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "状態が低下(通知不要、ログのみ記録)"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T06:00",
+            "hourlyRainfallMm": [
+              0.5,
+              1.1,
+              0.7,
+              0,
+              0,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "降雨条件を満たさない"
+          }
+        ],
+        "hazard_rain_state_change_persistence": [
+          {
+            "runInitialisationTime": "2026-09-08T00:00",
+            "hourlyRainfallMm": [
+              3,
+              19.1,
+              9,
+              0.1,
+              0.5,
+              1.2
+            ],
+            "rainCondition": "met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "candidate_unconfirmed",
+            "isCandidate": false,
+            "reason": "降雨条件は成立したが継続性が未確認"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T03:00",
+            "hourlyRainfallMm": [
+              0.9,
+              1.8,
+              2.8,
+              0.3,
+              0.2,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "状態が低下(通知不要、ログのみ記録)"
+          },
+          {
+            "runInitialisationTime": "2026-09-08T06:00",
+            "hourlyRainfallMm": [
+              0.5,
+              1.1,
+              0.7,
+              0,
+              0,
+              0.1
+            ],
+            "rainCondition": "not_met",
+            "forecastInternalPersistenceMet": false,
+            "forecastRunPersistenceMet": false,
+            "newInternalState": "normal",
+            "isCandidate": false,
+            "reason": "降雨条件を満たさない"
           }
         ]
       }

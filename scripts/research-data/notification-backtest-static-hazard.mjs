@@ -130,6 +130,9 @@ async function runForPoint(point, runTimes) {
     pointId: point.pointId,
     latitude: point.latitude,
     longitude: point.longitude,
+    // 技術確認2回目の追記: 固定JSON側のtechnicalVerificationOnlyをそのまま引き継ぎ、
+    // Backtest結果上でも本実験データと明確に区別できるようにする。
+    technicalVerificationOnly: point.technicalVerificationOnly,
     // §15 PART N: レポート上はunknownをinsufficient_dataとして表示する
     // (evaluateMethod自体の候補判定ロジックは既にunknownを候補にしない設計)。
     staticFloodHazardStatus: toBacktestHazardStatusLabel(staticFloodHazardStatus),
