@@ -29,14 +29,33 @@ export type ForecastRunSnapshot = {
   /** 次の1〜6時間分の時間雨量(mm)。index 0 = 直近1時間。欠測はnull。 */
   hourlyRainfallMm: (number | null)[];
   /**
-   * PART11: Open-Meteoの標準レスポンスにはモデルrun時刻の明示的な
-   * フィールドが存在しないことを実際のAPI呼び出しで確認した
-   * (generationtime_msはAPI応答生成時間であり、モデルrun時刻ではない)。
-   * そのため現在時刻をmodelRunTimeとして代用せず、主要な予測値から
-   * 計算したハッシュで「前回と同一の予報内容か」を識別する。
+   * 【run再現性監査で修正・重要】以前は「Open-Meteoの標準レスポンスに
+   * run時刻の明示フィールドが無い」という理由でcontentHashのみをrun識別に
+   * 使っていた。その後、Open-Meteo公式ドキュメントで、標準のforecast API
+   * (/v1/jma)は「run識別を保証しない」一方、Single Runs API
+   * (single-runs-api.open-meteo.com)は&run=パラメータでrun初期時刻
+   * (runInitialisationTime)を明示的に指定・識別できることを確認した
+   * (実際にAPIを呼び出し、同一run再取得時の再現性・3時間後の別runとの
+   * 区別・168時間分のforecast horizon保持を確認済み)。
+   * そのためrunInitialisationTimeを追加し、Single Runs API使用時は
+   * これを優先的なrun識別子として使う（標準のforecast APIから取得した
+   * 場合はnullのままとし、その場合のみcontentHashにフォールバックする。
+   * PART4: contentHashは「内容が変化したかの確認用」であり、run IDの
+   * 代替としては使わない）。
    */
+  runInitialisationTime: string | null;
+  /** 予報内容から計算した簡易ハッシュ（内容の同一性確認の補助情報） */
   contentHash: string;
 };
+
+/**
+ * run識別に使うキーを解決する。runInitialisationTimeが分かればそれを
+ * 優先し、無い場合（標準forecast API使用時）のみcontentHashにフォールバック
+ * する（PART4の方針）。
+ */
+export function resolveRunKey(forecast: ForecastRunSnapshot): string {
+  return forecast.runInitialisationTime ?? forecast.contentHash;
+}
 
 /** hourlyRainfallMmから、先頭N時間の積算値を計算する。欠測が1つでもあればnull（外挿しない）。 */
 export function accumulateRainfall(hourly: (number | null)[], hours: number): number | null {
@@ -157,8 +176,12 @@ export type NotificationInternalState = "normal" | "candidate_unconfirmed" | "ca
 export type PersistenceTracking = {
   /** forecast run間継続性(PART5-B): 直近何回連続で降雨条件が"met"だったか */
   consecutiveRunsMatched: number;
-  /** 直前に評価したforecastのcontentHash(重複evaluation検出用、PART11・12) */
-  lastEvaluatedContentHash: string | null;
+  /**
+   * 直前に評価したrunの識別キー(重複evaluation検出用、PART4修正)。
+   * resolveRunKey()の結果を保持する
+   * (runInitialisationTimeがあればそれ、無ければcontentHash)。
+   */
+  lastEvaluatedRunKey: string | null;
 };
 
 export type NotificationPointState = {
@@ -169,17 +192,18 @@ export type NotificationPointState = {
 export function initialNotificationPointState(): NotificationPointState {
   return {
     internalState: "normal",
-    persistence: { consecutiveRunsMatched: 0, lastEvaluatedContentHash: null },
+    persistence: { consecutiveRunsMatched: 0, lastEvaluatedRunKey: null },
   };
 }
 
 /**
- * PART11・12: 今回取得したforecastが前回評価と全く同一内容かどうかを判定する。
+ * PART6: 今回取得したforecastが前回評価と同一runかどうかを判定する。
  * 同一であれば、Scheduled Functions側で評価自体をskipする設計に使える
- * (無駄な再評価を避ける)。
+ * (無駄な再評価を避ける)。runInitialisationTimeがあればそれで判定し、
+ * 無い場合のみcontentHashにフォールバックする(resolveRunKey参照)。
  */
 export function hasForecastChanged(forecast: ForecastRunSnapshot, prev: NotificationPointState): boolean {
-  return forecast.contentHash !== prev.persistence.lastEvaluatedContentHash;
+  return resolveRunKey(forecast) !== prev.persistence.lastEvaluatedRunKey;
 }
 
 // ============================================================
@@ -290,13 +314,17 @@ export function evaluateMethod(
     };
   }
 
-  // --- run間継続性の更新(重複evaluationはskip扱い、PART11・12) ---
-  const contentUnchanged = forecast.contentHash === previousState.persistence.lastEvaluatedContentHash;
-  const updatedPersistence: PersistenceTracking = contentUnchanged
+  // --- run間継続性の更新(同一runの重複evaluationはskip扱い、PART4・6) ---
+  // 【重要】runInitialisationTimeがあればそれをrunの同一性判定に使い、
+  // 無い場合(標準forecast API使用時)のみcontentHashにフォールバックする
+  // (resolveRunKey参照。run再現性監査での修正点)。
+  const runKey = resolveRunKey(forecast);
+  const sameRun = runKey === previousState.persistence.lastEvaluatedRunKey;
+  const updatedPersistence: PersistenceTracking = sameRun
     ? previousState.persistence
     : {
         consecutiveRunsMatched: rainCondition === "met" ? previousState.persistence.consecutiveRunsMatched + 1 : 0,
-        lastEvaluatedContentHash: forecast.contentHash,
+        lastEvaluatedRunKey: runKey,
       };
   const forecastRunPersistenceMet = updatedPersistence.consecutiveRunsMatched >= config.requiredConsecutiveRuns;
 

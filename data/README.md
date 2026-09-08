@@ -380,6 +380,55 @@ Phase3の危険度判定に、洪水・内水氾濫・高潮のうち何件を�
   1時間刻み・96時間先まで（3〜24時間規模の積算向き）。どちらか一方で
   他方の代わりをしない（例：60分予測から24時間分を外挿しない）。
 
+## forecast run再現性の監査結果（重要な訂正）
+
+- **確認日**: 2026-09-08
+- 前回のBacktest（`historical-forecast-api`使用）は、「forecast run間継続性」
+  の検証に**不適切だった**ことを公式ドキュメントで確認した。公式には
+  「各runの最初の数時間だけがつなぎ合わされた連続時系列」
+  ("Each run's first few hours are stitched into a continuous hourly
+  timeseries.")と明記されており、個々のrunの全forecast horizonを保持して
+  いない。前回の「区域内2→1件、区域外6→0件」という結果は、**コードが
+  動作することを確認した予備的な技術確認結果**であり、run間継続性を
+  正しく再現した研究結果ではない（本実験データとしては使用しない）。
+- 代わりに **Single Runs API**
+  (`https://single-runs-api.open-meteo.com/v1/forecast`、`&run=`パラメータで
+  run初期時刻を明示指定)を使うことで、個々のJMA MSM runを独立に取得できる
+  ことを実際のAPI呼び出しで確認した。
+  - 同一run再取得時の完全な再現性を確認
+  - 3時間後の別run("...T03:00"等)が異なる予報値を返すことを確認
+  - 1回のレスポンスで168時間(7日間)分のforecast horizonを保持することを確認
+  - JMA MSM(`models=jma_msm`)で200 OKを確認
+  - 利用可能期間: 大多数のモデルは2026年4月2日以降にアーカイブされたrunの
+    み取得可能（公式記載）。本実験期間はこの制約を客観的な下限とする。
+- **重要な追加発見**: run初期化時刻の直後（実際に35分後で検証）は、まだ
+  Single Runs APIで取得できないことを実際に確認した
+  （400エラー："The requested model run is not available"）。
+  run初期化時刻と実際にAPI上で利用可能になる時刻には時間差があるとみられる
+  （Open-MeteoのMetadata API概念にある`last_run_availability_time`に相当）。
+  本番監視でこのAPIを使う場合、run初期化直後を即座に評価しようとせず、
+  十分な安全マージンを設けるか、Metadata APIで実際の利用可能時刻を
+  確認してから取得する設計が必要（Metadata APIの正確なエンドポイントURLは
+  今回のセッションでは確認できておらず、実装前に別途確認が必要）。
+- **もう1つの発見**: Single Runs APIのレスポンスは、run初期化時刻そのもの
+  に対応する先頭の1件が常に`null`になる（直前1時間分のデータが存在しない
+  ため）。「次の1〜6時間」を計算する際は、この先頭要素を除いた
+  index 1〜6を使う必要がある（`scripts/research-data/
+  notification-run-verification.mjs`で実装・確認済み）。
+- `lib/notificationExperiment.ts`の`ForecastRunSnapshot`に
+  `runInitialisationTime`を追加し、run間継続性の判定はこれを優先的な識別子
+  として使うよう変更した（`contentHash`は「内容が変化したかの確認用」の
+  補助情報として残すのみで、run IDの代替としては使わない）。
+- Backtestを二層に分離する方針とした：
+  - **Rain Event Dataset**（`historical-forecast-api`使用）：雨天日・降雨
+    イベント・IETDによるイベント分離等、連続的な実況把握が目的
+  - **Forecast Run Dataset**（`fetchSingleRun()`使用）：forecast run間継続性
+    の検証が目的
+  - `scripts/research-data/notification-backtest.mjs`（Rain Event Dataset
+    用途に限定、既存のまま）と`scripts/research-data/
+    notification-run-verification.mjs`（Forecast Run Dataset用途、新規）
+    に分離した。
+
 ## 通知判定ロジックの位置づけ（重要・繰り返し明記）
 
 `lib/notificationExperiment.ts`以下で実装している「案C」（staticFloodHazard

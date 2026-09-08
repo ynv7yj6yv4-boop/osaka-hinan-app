@@ -9,6 +9,7 @@ import {
   checkRainCondition,
   checkForecastInternalPersistence,
   hasForecastChanged,
+  resolveRunKey,
   initialNotificationPointState,
   evaluateMethod,
   type ForecastRunSnapshot,
@@ -24,8 +25,12 @@ const CONFIG: NotificationExperimentConfig = {
   requiredConsecutiveRuns: 2,
 };
 
-function snapshot(hourly: (number | null)[], fetchedAt = "2026-09-08T00:00:00.000Z"): ForecastRunSnapshot {
-  return { fetchedAt, hourlyRainfallMm: hourly, contentHash: hashForecastContent(hourly) };
+function snapshot(
+  hourly: (number | null)[],
+  fetchedAt = "2026-09-08T00:00:00.000Z",
+  runInitialisationTime: string | null = null
+): ForecastRunSnapshot {
+  return { fetchedAt, hourlyRainfallMm: hourly, runInitialisationTime, contentHash: hashForecastContent(hourly) };
 }
 
 // --- accumulateRainfall / maxHourlyRainfall ---
@@ -89,7 +94,7 @@ test("checkForecastInternalPersistence: 連続していなければfalse", () =>
 
 test("hasForecastChanged: 同一内容ならfalse", () => {
   const s = snapshot([1, 2, 3]);
-  const state = { internalState: "normal" as const, persistence: { consecutiveRunsMatched: 0, lastEvaluatedContentHash: s.contentHash } };
+  const state = { internalState: "normal" as const, persistence: { consecutiveRunsMatched: 0, lastEvaluatedRunKey: resolveRunKey(s) } };
   assert.equal(hasForecastChanged(s, state), false);
 });
 
@@ -252,4 +257,58 @@ test("同一内容のforecast(重複evaluation)ではrun間継続カウントを
     config: CONFIG,
   });
   assert.equal(duplicate.updatedState.persistence.consecutiveRunsMatched, first.updatedState.persistence.consecutiveRunsMatched);
+});
+
+// --- run再現性監査(Single Runs API対応): resolveRunKey ---
+
+test("resolveRunKey: runInitialisationTimeがあればそれを優先する", () => {
+  const s = snapshot([1, 2, 3], "2026-09-08T00:00:00.000Z", "2026-09-07T00:00");
+  assert.equal(resolveRunKey(s), "2026-09-07T00:00");
+});
+
+test("resolveRunKey: runInitialisationTimeが無ければcontentHashにフォールバックする", () => {
+  const s = snapshot([1, 2, 3], "2026-09-08T00:00:00.000Z", null);
+  assert.equal(resolveRunKey(s), s.contentHash);
+});
+
+test("run間継続性: 同じrunInitialisationTimeなら内容が同じでも同一runとして扱う(重複評価防止)", () => {
+  const s1 = snapshot([15, 0, 0, 0, 0, 0], "2026-09-08T00:00:00.000Z", "2026-09-07T00:00");
+  const first = evaluateMethod("hazard_rain_state_change_persistence", {
+    staticFloodHazardStatus: "hazard",
+    forecast: s1,
+    previousState: initialNotificationPointState(),
+    config: CONFIG,
+  });
+  // 同じrunInitialisationTimeを、取得のたびに微妙に値が変わる可能性のある
+  // 標準APIから再取得したと仮定(contentHashは変わるが、runは同一)
+  const s1Again = snapshot([15, 0.001, 0, 0, 0, 0], "2026-09-08T00:05:00.000Z", "2026-09-07T00:00");
+  const duplicate = evaluateMethod("hazard_rain_state_change_persistence", {
+    staticFloodHazardStatus: "hazard",
+    forecast: s1Again,
+    previousState: first.updatedState,
+    config: CONFIG,
+  });
+  assert.equal(
+    duplicate.updatedState.persistence.consecutiveRunsMatched,
+    first.updatedState.persistence.consecutiveRunsMatched
+  );
+});
+
+test("run間継続性: runInitialisationTimeが3時間進んだ別runなら新しいrunとして継続カウントを進める", () => {
+  const s1 = snapshot([15, 0, 0, 0, 0, 0], "2026-09-08T00:00:00.000Z", "2026-09-07T00:00");
+  const first = evaluateMethod("hazard_rain_state_change_persistence", {
+    staticFloodHazardStatus: "hazard",
+    forecast: s1,
+    previousState: initialNotificationPointState(),
+    config: CONFIG,
+  });
+  const s2 = snapshot([16, 0, 0, 0, 0, 0], "2026-09-08T03:00:00.000Z", "2026-09-07T03:00"); // 3時間後の別run
+  const second = evaluateMethod("hazard_rain_state_change_persistence", {
+    staticFloodHazardStatus: "hazard",
+    forecast: s2,
+    previousState: first.updatedState,
+    config: CONFIG,
+  });
+  assert.equal(second.newInternalState, "candidate_confirmed"); // requiredConsecutiveRuns=2で到達
+  assert.equal(second.isCandidate, true);
 });

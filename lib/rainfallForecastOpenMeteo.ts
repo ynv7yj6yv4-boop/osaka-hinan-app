@@ -88,8 +88,91 @@ export async function fetchHourlyPrecipitationForecast(
   return { status: "ok", fetchedAt, hourly: points, source: SOURCE };
 }
 
+// 試作3 run再現性監査（PART2・3）: Single Runs APIで、特定のJMA MSM run
+// (runInitialisationTime)を個別に取得する。
+//
+// 【この関数を追加した理由】
+// historical-forecast-api（下記fetchHistoricalHourlyPrecipitation）は
+// 「各runの最初の数時間だけを継ぎ合わせた連続時系列」であり、個々のrunの
+// 全forecast horizonを保持していないことを公式ドキュメントで確認した
+// ("Each run's first few hours are stitched into a continuous hourly
+// timeseries.")。そのため、forecast run間継続性の検証には不適切であり、
+// 代わりにこのSingle Runs APIを使う。
+//
+// 【実際に確認した仕様】(2026-09-08、実際にAPIを呼び出して確認)
+// - エンドポイント: https://single-runs-api.open-meteo.com/v1/forecast
+// - &run=<ISO8601、秒なし> でrun初期時刻を指定(例: "2026-09-07T00:00")
+// - JMA MSM(models=jma_msm)で200 OKを確認
+// - 同一runを2回取得すると完全に同じ値が返る(再現性を確認)
+// - 3時間後の別run("2026-09-07T03:00")を指定すると異なる値が返る
+//   (別runとして区別できることを確認)
+// - 1回のレスポンスで168時間(7日間)分のforecast horizonを保持(確認済み)
+// - 利用可能期間: 公式ドキュメントによれば大多数のモデルは
+//   「2026年4月2日」以降にアーカイブされたrunのみ取得可能
+//   (この制約は研究期間選定の客観的制約として扱う。PART10)。
+const OPEN_METEO_SINGLE_RUN_URL = "https://single-runs-api.open-meteo.com/v1/forecast";
+
+export type SingleRunResult =
+  | {
+      status: "ok";
+      fetchedAt: string;
+      runInitialisationTime: string;
+      hourly: HourlyPrecipitationPoint[];
+      source: "open-meteo-jma-msm-single-run";
+    }
+  | { status: "unavailable"; fetchedAt: string; runInitialisationTime: string; source: "open-meteo-jma-msm-single-run" };
+
+/**
+ * runInitialisationTime(例: "2026-09-07T00:00", ISO8601・秒なし)を指定して、
+ * そのrunの全forecast horizonを取得する。
+ */
+export async function fetchSingleRun(
+  lat: number,
+  lng: number,
+  runInitialisationTime: string
+): Promise<SingleRunResult> {
+  const fetchedAt = new Date().toISOString();
+  const runSource = "open-meteo-jma-msm-single-run" as const;
+  const url =
+    `${OPEN_METEO_SINGLE_RUN_URL}?latitude=${lat}&longitude=${lng}` +
+    `&hourly=precipitation&models=jma_msm&run=${encodeURIComponent(runInitialisationTime)}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    return { status: "unavailable", fetchedAt, runInitialisationTime, source: runSource };
+  }
+  if (!res.ok) return { status: "unavailable", fetchedAt, runInitialisationTime, source: runSource };
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return { status: "unavailable", fetchedAt, runInitialisationTime, source: runSource };
+  }
+
+  const hourly = (data as { hourly?: { time?: string[]; precipitation?: number[] } })?.hourly;
+  if (!hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.precipitation)) {
+    return { status: "unavailable", fetchedAt, runInitialisationTime, source: runSource };
+  }
+
+  const points: HourlyPrecipitationPoint[] = hourly.time.map((t, i) => ({
+    time: t,
+    precipitationMm: typeof hourly.precipitation![i] === "number" ? hourly.precipitation![i] : null,
+  }));
+
+  return { status: "ok", fetchedAt, runInitialisationTime, hourly: points, source: runSource };
+}
+
 // 試作3 通知判定ロジックの実験実装 PART16: 過去に実際に発表された予報の
 // 時系列を取得する(Backtest用)。
+//
+// 【PART8で明確化した役割】このAPIは「forecast runの予報精度・継続性を
+// 再現する」用途には使わない（そのためにはfetchSingleRun()を使う）。
+// このAPIは引き続き、雨天日抽出・降雨イベント抽出・IETDによるイベント
+// 分離等、「連続的な実況に近い時系列の把握」の用途にのみ使う
+// (PART9のRain Event Dataset)。
 //
 // 【重要な限界】Open-Meteo公式ドキュメントによれば、このAPIは
 // 「各モデル更新の最初の数時間を継ぎ合わせた連続時系列」であり、
