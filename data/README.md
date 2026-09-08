@@ -487,3 +487,94 @@ Aが最も実装コストと通知遅延のバランスが良いと考えられ�
   `functions/src/index.ts`の定期監視は現時点では実際の降雨予測・
   静的ハザード情報を取得せず、常に`insufficient_data`相当のダミー入力で
   評価関数を呼び出す配管確認にとどまっている。
+
+# 要件定義書3で追加した内容
+
+## staticFloodHazard方式B（研究用固定データ生成パイプライン）
+
+上記「Firebase Scheduled Functionsの技術的制約」で書いたとおり、
+Node.js環境でのタイルPNGデコード（方式A）は未実装のままである。
+一方、Notification Backtest（`lib/notificationExperiment.ts`の
+Method1〜4比較）は、各研究地点のstaticFloodHazard状態
+（hazard/outside/unknown）を実際の判定結果として必要とする。
+
+このギャップを埋めるため、**方式B「既存ブラウザ判定 → 研究用固定JSON」**
+を実装した。
+
+- **本番Firebase監視用ではない。Notification Backtest研究専用**である。
+  将来、任意地点を自動判定する本番監視には、引き続き方式A
+  （Node.js側PNGデコード）が別途必要になる。
+- 新しい洪水判定アルゴリズムは作らず、既存・検証済みの
+  `lib/hazardPixelClassifier.ts` / `lib/tilePixel.ts`（ブラウザの
+  Canvas APIに依存するため、ブラウザ側でのみ実行できる）を
+  そのまま呼び出す。404 = unknown（outsideにしない）等の既存ルールは
+  一切変更していない。
+
+### パイプライン構成
+
+1. **研究地点入力**: `scripts/research-data/research-monitoring-points.json`。
+   人間が入力してよいのは`pointId`・座標・selection関連メタデータのみ
+   （floodStatus等の判定結果は含まない）。`selectionGroup`・
+   `selectionReason`はまだ正式な地点分類が確定していないことを示す
+   中立的な値（`"technical_verification"`）のみを使っている。
+2. **Hazard Capture（開発用ページ）**:
+   `app/dev/static-flood-hazard-capture/page.tsx`
+   （`NEXT_PUBLIC_ENABLE_DEV_TOOLS=1`の場合のみ有効）。
+   ブラウザ上で研究地点ごとに`classifyHazardPixel()`を実行し、
+   結果を確認できる簡易テーブルを表示する。
+3. **変換ロジック（純粋関数・単体テスト対象）**:
+   `lib/staticFloodHazardCapture.ts`。`HazardPixelStatus` →
+   保存用レコードへの変換、固定JSON全体の組み立て（provenance付与）を担う。
+4. **保存API**: `app/api/dev/static-flood-hazard-capture/route.ts`
+   （開発用ページからのみ呼ばれる。本番環境では403を返し無効化）。
+   `gitCommit`（`git rev-parse HEAD`）・`systemVersion`
+   （`package.json`の`version`）等のprovenanceを付与し、
+   `scripts/research-data/static-flood-hazard-points.json`へ書き出す。
+5. **固定JSON**: `scripts/research-data/static-flood-hazard-points.json`。
+   `metadata`（provenance）と`points`（地点ごとの判定結果）に分離した構造。
+   Backtest実行のたびに最新のタイルへ再アクセスするのではなく、
+   この時点の判定結果を再利用することで、後日タイル・外部サービス・
+   コードが変化しても同じ研究入力で再現できるようにしている。
+6. **Notification Backtestとの接続**:
+   `scripts/research-data/notification-backtest-static-hazard.mjs`。
+   固定JSONの`floodStatus`をそのまま`staticFloodHazardStatus`として使い、
+   Single Runs API（forecast run再現。上記「forecast run再現性の監査結果」
+   参照）と組み合わせてMethod1〜4を評価する。仮定hazard
+   （`assumedHazard`）は使用しない。
+
+### 判定失敗地点の扱い
+
+タイル取得・判定に失敗した地点も、結果から黙って削除せず
+`floodStatus: "unknown"`として残す。理由（`floodStatusReason`）は
+`no_tile` / `fetch_error` / `color_unknown` / `browser_error` / `other`
+のいずれかを保持する。
+
+### 既存の`notification-backtest.mjs`（Historical Forecast API版）との関係
+
+要件定義書2時点で作成した`scripts/research-data/notification-backtest.mjs`
+は、Historical Forecast APIを使い、hazard状態を人間が仮定した値
+（`assumedHazard`）で技術確認するものだった。要件定義書3でのAPI用途整理
+（下記「forecast run再現性の監査結果」参照）により、Historical Forecast
+APIはRain Event Dataset（雨天日・IETD・降雨イベント抽出）専用、
+Single Runs APIはForecast Run Dataset（forecast run再現・Notification
+Backtest）専用という役割分担になった。そのため、
+`notification-backtest.mjs`は「技術確認用の履歴」としてそのまま残し、
+`assumedHazard`を含め変更していない。固定JSONと接続した現在の
+一気通貫パイプラインは`notification-backtest-static-hazard.mjs`を使う。
+
+### 動作確認結果（技術確認・2026-09-08時点）
+
+`research-monitoring-points.json`の技術確認用3地点（P001〜P003。
+いずれも大阪市内であることを事前確認済みの既存座標を流用。本実験地点ではない）
+について、実際にブラウザでHazard Captureを実行したところ、
+P001・P003は`outside`、P002は`unknown`（`no_tile`）という結果になった
+（大阪市内でも洪水浸水想定区域データが提供されていない、または
+その地点のタイルが透明である場所が実際にあることを示している。
+「大阪市＝全域ハザードタイル提供済み」ではないことに注意）。
+続けて`notification-backtest-static-hazard.mjs`でSingle Runs APIと
+接続したところ、Method1（Rain Only）はhazard状態に関わらず降雨条件のみで
+候補判定され、Method2〜4はP001・P003（outside）・P002（unknown/
+insufficient_data）のいずれでも一度も候補にならなかった（意図どおり。
+「outside/unknownを安全側の候補除外として扱うが、安全とは断定しない」
+という設計が実データでも機能することを確認できた）。この結果は技術確認用
+であり、卒論本実験結果ではない。

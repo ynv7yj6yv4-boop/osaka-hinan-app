@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "experimentPointsFinalized": false,
+    "notes": "要件定義書3 §4・PART C・PART P: 本実験地点はまだ人間側で決定していない。ここに含まれる地点は、staticFloodHazard方式Bのパイプライン(地点入力→既存ブラウザ洪水判定→固定JSON→Notification Backtest)が正しく動くことを確認するための技術確認用地点のみであり、卒論本実験結果には使用しない。座標はdata/README.md「研究用テスト地点との違い」に記載の、研究者が大阪市内であることを事前確認済みの地点(scripts/route-sampling-experiment.mjsのL1・L2・L5と同一)を流用している。selectionGroup/selectionReasonはまだ正式な地点選定分類ではないため、意味のある分類名(河川沿い・都心・低地等)をここで確定しない(要件定義書3 §5・PART D)。"
+  },
+  "points": [
+    {
+      "pointId": "P001",
+      "latitude": 34.6937,
+      "longitude": 135.5023,
+      "selectionGroup": "technical_verification",
+      "selectionReason": "パイプライン動作確認用。大阪市内であることを事前確認済みの既存座標(route-sampling-experiment.mjs L1)を流用。本実験地点ではない。",
+      "selectedBeforeExperiment": false,
+      "selectedAt": "2026-09-08T13:14:08.000Z"
+    },
+    {
+      "pointId": "P002",
+      "latitude": 34.6683,
+      "longitude": 135.4429,
+      "selectionGroup": "technical_verification",
+      "selectionReason": "パイプライン動作確認用。大阪市内であることを事前確認済みの既存座標(route-sampling-experiment.mjs L2)を流用。本実験地点ではない。",
+      "selectedBeforeExperiment": false,
+      "selectedAt": "2026-09-08T13:14:08.000Z"
+    },
+    {
+      "pointId": "P003",
+      "latitude": 34.6127,
+      "longitude": 135.5138,
+      "selectionGroup": "technical_verification",
+      "selectionReason": "パイプライン動作確認用。大阪市内であることを事前確認済みの既存座標(route-sampling-experiment.mjs L5)を流用。本実験地点ではない。",
+      "selectedBeforeExperiment": false,
+      "selectedAt": "2026-09-08T13:14:08.000Z"
+    }
+  ]
+}

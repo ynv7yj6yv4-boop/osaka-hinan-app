@@ -22,6 +22,17 @@
 //    「コードが正しく動くことを確認するための仮の地点」であり、
 //    本実験用に選定されたものではない。
 //
+// 【要件定義書3 §14・PART L追記・technical verification only】
+// このスクリプトはHistorical Forecast APIを使った初期の技術確認であり、
+// 履歴として残している。要件定義書3 §53・54で、Historical Forecast APIの用途は
+// 「Rain Event Dataset」(雨天日・IETD・降雨イベント抽出)に整理され、
+// forecast run再現・Notification Backtestの役割はSingle Runs APIへ移した。
+// 固定JSON(scripts/research-data/static-flood-hazard-points.json)を使い、
+// Single Runs APIと接続した現在の一気通貫パイプラインは
+// notification-backtest-static-hazard.mjs を参照。このファイルの
+// assumedHazard(仮定hazard)は、上記の役割整理より前の技術確認結果として
+// そのまま残しており、本実験の入力としては使用しない。
+//
 // 実行方法: node scripts/research-data/notification-backtest.mjs
 
 import { writeFileSync, mkdirSync } from "node:fs";

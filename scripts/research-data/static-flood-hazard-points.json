@@ -1,0 +1,60 @@
+{
+  "metadata": {
+    "generatedAt": "2026-09-08T13:18:21.097Z",
+    "systemVersion": "0.1.0",
+    "gitCommit": "c8d33296888bdc174d24fd8e5b77226abee91074",
+    "ruleVersion": "phase5a3-static-only-v2",
+    "hazardDataSource": "国土交通省 ハザードマップポータルサイト「重ねるハザードマップ」洪水浸水想定区域データ（想定最大規模 L2）",
+    "sourceURLPattern": "https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png",
+    "classifierVersion": "static-flood-hazard-capture-method-b-v1",
+    "generationMethod": "既存ブラウザ側の洪水ハザード判定（lib/hazardPixelClassifier.ts, lib/tilePixel.ts）をそのまま利用して生成した研究用固定データ（方式B）。新しい判定アルゴリズムは作成していない。本番Firebase監視用の最終方式ではない（要件定義書3 §66・67）。",
+    "notes": "Notification Backtest研究専用の固定データ（技術確認目的を含む）。Backtest実行のたびに最新のハザードタイルへ再アクセスするのではなく、この時点の判定結果を再利用することで、後日タイル・外部サービス・コードが変化しても同じ研究入力で再現できるようにしている。"
+  },
+  "points": [
+    {
+      "pointId": "P001",
+      "latitude": 34.6937,
+      "longitude": 135.5023,
+      "dataSource": "国土交通省 ハザードマップポータルサイト「重ねるハザードマップ」洪水浸水想定区域データ（想定最大規模 L2）",
+      "evaluatedAt": "2026-09-08T13:18:21.097Z",
+      "ruleVersion": "phase5a3-static-only-v2",
+      "systemVersion": "0.1.0",
+      "gitCommit": "c8d33296888bdc174d24fd8e5b77226abee91074",
+      "floodStatus": "outside",
+      "floodStatusReason": null,
+      "depthRank": 0,
+      "expectedDepthLabel": null,
+      "assessmentCompleteness": "complete"
+    },
+    {
+      "pointId": "P002",
+      "latitude": 34.6683,
+      "longitude": 135.4429,
+      "dataSource": "国土交通省 ハザードマップポータルサイト「重ねるハザードマップ」洪水浸水想定区域データ（想定最大規模 L2）",
+      "evaluatedAt": "2026-09-08T13:18:21.097Z",
+      "ruleVersion": "phase5a3-static-only-v2",
+      "systemVersion": "0.1.0",
+      "gitCommit": "c8d33296888bdc174d24fd8e5b77226abee91074",
+      "floodStatus": "unknown",
+      "floodStatusReason": "no_tile",
+      "depthRank": null,
+      "expectedDepthLabel": null,
+      "assessmentCompleteness": "unavailable"
+    },
+    {
+      "pointId": "P003",
+      "latitude": 34.6127,
+      "longitude": 135.5138,
+      "dataSource": "国土交通省 ハザードマップポータルサイト「重ねるハザードマップ」洪水浸水想定区域データ（想定最大規模 L2）",
+      "evaluatedAt": "2026-09-08T13:18:21.097Z",
+      "ruleVersion": "phase5a3-static-only-v2",
+      "systemVersion": "0.1.0",
+      "gitCommit": "c8d33296888bdc174d24fd8e5b77226abee91074",
+      "floodStatus": "outside",
+      "floodStatusReason": null,
+      "depthRank": 0,
+      "expectedDepthLabel": null,
+      "assessmentCompleteness": "complete"
+    }
+  ]
+}
