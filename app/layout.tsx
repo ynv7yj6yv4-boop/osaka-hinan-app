@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "大阪市 避難支援マップ（試作版）",
-  description: "大阪市を対象とした災害避難支援Webアプリ（開発中）",
+  title: "大阪市 避難支援マップ",
+  description: "大阪市を対象とした災害避難支援Webアプリ",
   // 試作3 PART B-4: iOSの「ホーム画面に追加」時のタイトル表示に使われる。
   appleWebApp: {
     title: "避難支援マップ",

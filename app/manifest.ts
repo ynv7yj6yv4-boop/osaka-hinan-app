@@ -14,10 +14,10 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "大阪市 避難支援マップ（試作版）",
+    name: "大阪市 避難支援マップ",
     short_name: "避難支援マップ",
     description:
-      "大阪市を対象とした災害避難支援Webアプリ（試作版）。現在地の洪水・内水氾濫ハザード情報や、洪水時の参考避難ルートを確認できます。",
+      "大阪市を対象とした災害避難支援Webアプリ。現在地の洪水・内水氾濫ハザード情報や、洪水時の参考避難ルートを確認できます。",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

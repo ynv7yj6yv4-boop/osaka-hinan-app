@@ -389,7 +389,7 @@ export default function MapView() {
               RiskDetailModal等で引き続き確認できる）。 */}
           <div className="pointer-events-auto rounded-xl bg-white/95 px-3 py-1.5 shadow [@media(orientation:landscape)]:hidden">
             <h1 className="text-sm font-bold leading-tight text-zinc-900">
-              大阪市 避難支援マップ（試作版）
+              大阪市 避難支援マップ
             </h1>
             <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">
               ※参考情報です。公式情報も必ずご確認ください。
@@ -416,7 +416,7 @@ export default function MapView() {
               横向きでも引き続き表示する。 */}
           {position && areaCheck === "likely_osaka_or_nearby" && (
             <div className="pointer-events-auto rounded-lg border border-zinc-300 bg-white/95 px-3 py-1 text-xs text-zinc-600 shadow [@media(orientation:landscape)]:hidden">
-              現在のMVPは大阪市が対象です（市外では情報が不正確な場合があります）
+              現在は大阪市を対象としています（市外では情報が不正確な場合があります）
             </div>
           )}
 
