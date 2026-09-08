@@ -45,6 +45,9 @@ export default function RiskCard({
             ⚠ 一部のハザード情報を確認できていません
           </span>
         )}
+        <span className="mt-0.5 block text-xs text-zinc-500">
+          📍「再取得」で降雨情報を更新できます
+        </span>
       </span>
       <span className="text-sm font-bold text-zinc-500 underline shrink-0">理由を見る</span>
     </button>
