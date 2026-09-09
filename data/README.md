@@ -474,7 +474,7 @@ JMA MSMは3時間おきに更新されるため、10分間隔での全量取得�
 
 Aが最も実装コストと通知遅延のバランスが良いと考えられるが、まだ確定していない。
 
-## Firebase Scheduled Functionsの技術的制約（重要・未解決）
+## Firebase Scheduled Functionsの技術的制約（要件定義書3「方式A」で解決）
 
 - `lib/tilePixel.ts`（ハザード・降雨タイルのピクセル読み取り）は、
   ブラウザの`Canvas`/`Image`/`URL.createObjectURL`に依存しており、
@@ -482,11 +482,12 @@ Aが最も実装コストと通知遅延のバランスが良いと考えられ�
 - 判定ロジック自体（`hazardPixelClassifier.ts`の`interpretTileSample`、
   `rainfallColorLegend.ts`の`matchRainfallColor`）は純粋な計算のため
   サーバー側でも再利用できるが、「タイル画像を取得してピクセル色を読む」
-  というI/O部分だけは、Node.js対応の別実装（例: `pngjs`等によるPNG
-  デコード）が必要。**この部分は試作3時点で未実装**であり、
-  `functions/src/index.ts`の定期監視は現時点では実際の降雨予測・
-  静的ハザード情報を取得せず、常に`insufficient_data`相当のダミー入力で
-  評価関数を呼び出す配管確認にとどまっている。
+  というI/O部分だけは、Node.js対応の別実装が必要だった。
+- **要件定義書3「方式A」でこれを解決した**。詳細は下記
+  「staticFloodHazard方式A（Node.js側での実データ取得）」を参照。
+  `functions/src/index.ts`の定期監視は、現在は実際の降雨予測・静的ハザード
+  情報を取得している（ただし実際のFCM送信コードはまだ実装しておらず、
+  `notificationDecisionConfig.enabled`もfalseのまま）。
 
 # 要件定義書3で追加した内容
 
@@ -603,3 +604,53 @@ Single Runs→Method2〜4）が正しく動作するかを確認する目的で�
 本実験開始時には、人間側が事前に決定した研究地点リストに対して、
 `technicalVerificationOnly: false`を明示的に設定した上で固定JSONを
 再生成する。
+
+## staticFloodHazard方式A（Node.js側での実データ取得）
+
+上記「Firebase Scheduled Functionsの技術的制約」を解決するため、
+Firebase Functions側（Node.js環境）で実際にハザードタイル・降雨予測タイルを
+取得・判定できるようにした。**方式B（研究用固定JSON生成、ブラウザ実行）とは
+別物であり、こちらは本番Firebase監視で任意地点をリアルタイム判定するための
+実装**である。
+
+### 実装内容
+
+- `functions/src/tilePixelNode.ts`: `lib/tilePixel.ts`のNode.js版。タイル座標
+  計算は完全に同じ式を複製し、PNGデコードのみブラウザのCanvas APIの代わりに
+  `pngjs`（Node.js用の純粋なPNGデコードライブラリ）を使う。
+- `functions/src/hazardPixelClassifierNode.ts`・`hazardColorLegend.ts`:
+  `lib/hazardPixelClassifier.ts`・`lib/hazardColorLegend.ts`の判定ロジックを
+  そのまま複製（新しい判定アルゴリズムは作っていない）。404 = unknown等の
+  既存ルールも維持。
+- `functions/src/rainfallForecastNode.ts`・`rainfallColorLegend.ts`:
+  `lib/rainfallForecast.ts`・`lib/rainfallColorLegend.ts`の判定ロジックを
+  そのまま複製。降雨予測データの出典・限界（気象庁の非公式URL、色→mm/h
+  対応が状況証拠の組み合わせであること等）もNext.jsアプリ側と同じ。
+- `functions/src/index.ts`（`checkMonitoringPoints`）: 上記を使い、監視地点
+  ごとに実際のstaticFloodHazard・rainfallForecastを並行取得して評価するよう
+  更新した。
+
+これらのファイルはNext.jsアプリ側（`lib/`）と意図的に内容を複製している
+（`notificationDecisionConfig.ts`と同じ方針。Firebase Functionsは独立した
+デプロイ単位で、モノレポ共有パッケージ化はしていないため）。判定ロジックを
+変更する場合は両方を同時に更新すること。
+
+### 検証結果
+
+技術確認地点P001〜P004（既にブラウザ側で`floodStatus`が判明済み）に対して
+`classifyHazardPixelNode()`を実行し、ブラウザ側の判定結果と完全に一致する
+ことを確認した（P001=outside, P002=unknown/no_tile, P003=outside,
+P004=hazard/depthRank2、すべて一致）。
+
+### まだ実装していないこと（重要）
+
+- **実際のFCM送信コードはまだ書いていない**。`checkMonitoringPoints`は
+  評価結果をFirestoreに記録するのみで、`evaluateNotificationDecision()`が
+  `"candidate"`を返した場合でも、実際にPush通知を送信する処理は無い。
+- `notificationDecisionConfig.enabled`は引き続き`false`。本番用の閾値
+  （`rainfallRankThreshold`・`hazardDepthRankThreshold`）も研究用に比較
+  検討している候補値のままで、最終決定していない。
+- 本番用の降雨予測データソース（`lib/rainfallForecast.ts`系のJMAナウキャスト
+  予測タイル）自体、色→mm/hの対応が状況証拠の組み合わせであり一次資料による
+  確認ではないという限界を抱えたまま（Backtest研究で使ったOpen-Meteo/JMA MSM
+  とは別の情報源であることに注意）。
