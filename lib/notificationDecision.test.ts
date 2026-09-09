@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateNotificationDecision } from "./notificationDecision.ts";
+import { evaluateNotificationDecision, evaluateFloodRiskNotificationDecision } from "./notificationDecision.ts";
 import type { NotificationDecisionConfig } from "./notificationDecisionConfig.ts";
 
 const ENABLED_CONFIG: NotificationDecisionConfig = {
@@ -15,6 +15,8 @@ const ENABLED_CONFIG: NotificationDecisionConfig = {
   rainfallRankThreshold: 6,
   hazardDepthRankThreshold: 1,
   cooldownMinutes: 60,
+  totalRainfallWindowHours: 24,
+  totalRainfallThresholdMm: 100,
 };
 
 const GOOD_HAZARD = { status: "evaluated" as const, depthRank: 2 as const };
@@ -134,4 +136,102 @@ test("cooldown期間を過ぎていればcandidateに戻る", () => {
     now,
   });
   assert.equal(result.type, "candidate");
+});
+
+// ============================================================
+// 要件定義書3: evaluateFloodRiskNotificationDecision
+// (「これから降り続けると予測される総雨量」ベースの判定)
+// ============================================================
+
+const GOOD_TOTAL_RAINFALL = { status: "evaluated" as const, totalPredictedRainfallMm: 150, windowHours: 24 };
+
+test("[flood risk] enabled:falseなら、条件を満たす入力でも必ずno_notificationになる（多重防御）", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: GOOD_HAZARD,
+    totalPredictedRainfall: GOOD_TOTAL_RAINFALL,
+    dataCompleteness: "complete",
+    previousNotificationState: NO_PREVIOUS,
+    config: { ...ENABLED_CONFIG, enabled: false },
+  });
+  assert.equal(result.type, "no_notification");
+});
+
+test("[flood risk] enabled:trueかつ予測総雨量が閾値以上ならcandidateになる", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: GOOD_HAZARD,
+    totalPredictedRainfall: GOOD_TOTAL_RAINFALL,
+    dataCompleteness: "complete",
+    previousNotificationState: NO_PREVIOUS,
+    config: ENABLED_CONFIG,
+  });
+  assert.equal(result.type, "candidate");
+});
+
+test("[flood risk] totalPredictedRainfallMmが閾値未満ならno_notification", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: GOOD_HAZARD,
+    totalPredictedRainfall: { status: "evaluated", totalPredictedRainfallMm: 10, windowHours: 24 },
+    dataCompleteness: "complete",
+    previousNotificationState: NO_PREVIOUS,
+    config: ENABLED_CONFIG,
+  });
+  assert.equal(result.type, "no_notification");
+});
+
+test("[flood risk] staticFloodHazardが区域外(depthRank=0)ならno_notification（総雨量だけでは候補にしない）", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: { status: "evaluated", depthRank: 0 },
+    totalPredictedRainfall: GOOD_TOTAL_RAINFALL,
+    dataCompleteness: "complete",
+    previousNotificationState: NO_PREVIOUS,
+    config: ENABLED_CONFIG,
+  });
+  assert.equal(result.type, "no_notification");
+});
+
+test("[flood risk] staticFloodHazard.status=unknownならinsufficient_data（unknownをoutside扱いしない）", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: { status: "unknown", depthRank: 0 },
+    totalPredictedRainfall: GOOD_TOTAL_RAINFALL,
+    dataCompleteness: "partial",
+    previousNotificationState: NO_PREVIOUS,
+    config: ENABLED_CONFIG,
+  });
+  assert.equal(result.type, "insufficient_data");
+});
+
+test("[flood risk] totalPredictedRainfallMm=nullならinsufficient_data（欠測を0扱いしない）", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: GOOD_HAZARD,
+    totalPredictedRainfall: { status: "unavailable", totalPredictedRainfallMm: null, windowHours: null },
+    dataCompleteness: "partial",
+    previousNotificationState: NO_PREVIOUS,
+    config: ENABLED_CONFIG,
+  });
+  assert.equal(result.type, "insufficient_data");
+});
+
+test("[flood risk] dataCompleteness=unavailableならinsufficient_data", () => {
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: GOOD_HAZARD,
+    totalPredictedRainfall: GOOD_TOTAL_RAINFALL,
+    dataCompleteness: "unavailable",
+    previousNotificationState: NO_PREVIOUS,
+    config: ENABLED_CONFIG,
+  });
+  assert.equal(result.type, "insufficient_data");
+});
+
+test("[flood risk] cooldown期間内ならcooldownを返す(evaluateNotificationDecisionと共通ロジック)", () => {
+  const now = new Date("2026-09-08T12:00:00Z");
+  const lastNotifiedAt = new Date("2026-09-08T11:30:00Z").toISOString(); // 30分前(cooldown=60分)
+  const result = evaluateFloodRiskNotificationDecision({
+    staticFloodHazard: GOOD_HAZARD,
+    totalPredictedRainfall: GOOD_TOTAL_RAINFALL,
+    dataCompleteness: "complete",
+    previousNotificationState: { lastNotificationState: "sent", lastNotifiedAt },
+    config: ENABLED_CONFIG,
+    now,
+  });
+  assert.equal(result.type, "cooldown");
 });

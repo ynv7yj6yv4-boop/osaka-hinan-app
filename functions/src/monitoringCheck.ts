@@ -1,17 +1,27 @@
 // 要件定義書3: checkMonitoringPointsの中核ロジックを、起動方法(Cloud Functions
 // のonSchedule / GitHub Actionsからの単体実行)に依存しない形で切り出したもの。
 //
-// 【重要】判定ロジック自体は一切変更していない。以前はfunctions/src/index.ts
-// (onScheduleハンドラ)の中に直接書かれていたコードを、そのままここへ移した
-// だけである(Cloud Functions版・スタンドアロン版の両方から呼べるようにする
-// ための切り出し)。
+// 【重要・このアプリの中心的な設計思想】
+// 「大雨が予測されたので通知する」のではなく、「これから降り続けると
+// 予測される総雨量が、静的ハザード想定区域内で道路の冠水を引き起こしうる
+// 規模かどうか」を判断してから通知する。そのため、ここでの主判定は
+// evaluateFloodRiskNotificationDecision()（Open-Meteo/JMA MSMの予測総雨量
+// ベース）を使う。以前からあるevaluateNotificationDecision()（その瞬間の
+// 気象庁ナウキャスト予測rankベース、60分先まで）も、比較・研究目的で
+// 引き続き並行評価し、両方の結果をFirestoreへ記録する
+// （どちらのみを本番採用するかは人間側が確定する）。
 
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
-import { evaluateNotificationDecision, type DataCompleteness } from "./notificationDecision";
+import {
+  evaluateNotificationDecision,
+  evaluateFloodRiskNotificationDecision,
+  type DataCompleteness,
+} from "./notificationDecision";
 import { notificationDecisionConfig } from "./notificationDecisionConfig";
 import { classifyHazardPixelNode, type HazardPixelStatus } from "./hazardPixelClassifierNode";
 import { fetchRainfallForecastNode } from "./rainfallForecastNode";
+import { fetchTotalPredictedRainfall } from "./floodRiskForecastNode";
 
 // components/hazardLayers.ts の HAZARD_TILE_URL.flood と同じ値（意図的に複製。
 // notificationDecisionConfig.targetHazard="flood"のみが対象のため、floodだけ持つ）。
@@ -55,46 +65,75 @@ export async function runMonitoringCheck(db: Firestore): Promise<MonitoringCheck
       continue;
     }
     const { latitude, longitude } = data;
+    const previousNotificationState = {
+      lastNotificationState: data.lastNotificationState ?? null,
+      lastNotifiedAt: data.lastNotifiedAt ?? null,
+    };
 
-    // 方式A: 実際のstaticFloodHazard・rainfallForecastを並行取得する。
-    const [hazardPixel, rainfallForecast] = await Promise.all([
+    // 方式A: 実際のstaticFloodHazard・ナウキャスト予測rank・予測総雨量を並行取得する。
+    const [hazardPixel, rainfallForecast, totalPredictedRainfall] = await Promise.all([
       classifyHazardPixelNode(FLOOD_HAZARD_TILE_URL, latitude, longitude),
       fetchRainfallForecastNode(latitude, longitude, notificationDecisionConfig.forecastHorizonMinutes),
+      fetchTotalPredictedRainfall(latitude, longitude, notificationDecisionConfig.totalRainfallWindowHours),
     ]);
 
     const staticFloodHazard = toStaticFloodHazardInput(hazardPixel);
+
+    // --- 主判定: 予測総雨量ベース(このアプリの中心的な設計思想) ---
+    const totalPredictedRainfallInput =
+      totalPredictedRainfall.status === "evaluated"
+        ? {
+            status: "evaluated" as const,
+            totalPredictedRainfallMm: totalPredictedRainfall.totalPredictedRainfallMm,
+            windowHours: totalPredictedRainfall.windowHours,
+          }
+        : { status: "unavailable" as const, totalPredictedRainfallMm: null, windowHours: null };
+
+    const floodRiskOk = staticFloodHazard.status === "evaluated";
+    const totalRainfallOk = totalPredictedRainfallInput.status === "evaluated";
+    const floodRiskDataCompleteness: DataCompleteness =
+      floodRiskOk && totalRainfallOk ? "complete" : floodRiskOk || totalRainfallOk ? "partial" : "unavailable";
+
+    const floodRiskDecision = evaluateFloodRiskNotificationDecision({
+      staticFloodHazard,
+      totalPredictedRainfall: totalPredictedRainfallInput,
+      dataCompleteness: floodRiskDataCompleteness,
+      previousNotificationState,
+      now,
+    });
+
+    // --- 比較用: 従来のナウキャストrankベース判定(研究目的で並行記録) ---
     const rainfallForecastInput =
       rainfallForecast.status === "forecast"
         ? { status: "forecast" as const, rank: rainfallForecast.rank, leadTimeMinutes: rainfallForecast.leadTimeMinutes }
         : { status: "unavailable" as const, rank: null, leadTimeMinutes: null };
-
-    const hazardOk = staticFloodHazard.status === "evaluated";
-    const rainfallOk = rainfallForecastInput.status === "forecast";
-    const dataCompleteness: DataCompleteness =
-      hazardOk && rainfallOk ? "complete" : hazardOk || rainfallOk ? "partial" : "unavailable";
-
-    const decision = evaluateNotificationDecision({
+    const rankRainfallOk = rainfallForecastInput.status === "forecast";
+    const rankDataCompleteness: DataCompleteness =
+      floodRiskOk && rankRainfallOk ? "complete" : floodRiskOk || rankRainfallOk ? "partial" : "unavailable";
+    const legacyDecision = evaluateNotificationDecision({
       staticFloodHazard,
       rainfallForecast: rainfallForecastInput,
-      dataCompleteness,
-      previousNotificationState: {
-        lastNotificationState: data.lastNotificationState ?? null,
-        lastNotifiedAt: data.lastNotifiedAt ?? null,
-      },
+      dataCompleteness: rankDataCompleteness,
+      previousNotificationState,
       now,
     });
 
-    if (decision.type === "candidate") candidateCount++; // enabled:falseの間は理論上到達しない
-    if (decision.type === "insufficient_data") insufficientDataCount++;
+    if (floodRiskDecision.type === "candidate") candidateCount++; // enabled:falseの間は理論上到達しない
+    if (floodRiskDecision.type === "insufficient_data") insufficientDataCount++;
 
     // 実際の通知送信(FCM)は行わない。確認した事実とバージョンのみ記録する。
     // 取得した実データも、後日の検証・研究のため記録として残す(黙って捨てない)。
     batch.update(doc.ref, {
       lastCheckedAt: FieldValue.serverTimestamp(),
       decisionVersion: notificationDecisionConfig.decisionVersion,
-      lastDecisionType: decision.type,
+      lastDecisionType: floodRiskDecision.type,
       lastStaticFloodHazardStatus: hazardPixel.status,
       lastStaticFloodHazardDepthRank: staticFloodHazard.depthRank,
+      lastTotalPredictedRainfallStatus: totalPredictedRainfallInput.status,
+      lastTotalPredictedRainfallMm: totalPredictedRainfallInput.totalPredictedRainfallMm,
+      lastTotalPredictedRainfallWindowHours: totalPredictedRainfallInput.windowHours,
+      // 比較用(研究目的)。本番採用の判定はlastDecisionType(予測総雨量ベース)。
+      lastLegacyRankDecisionType: legacyDecision.type,
       lastRainfallForecastStatus: rainfallForecastInput.status,
       lastRainfallForecastRank: rainfallForecastInput.rank,
       lastEvaluatedForecastTime: rainfallForecast.status === "forecast" ? rainfallForecast.forecastValidTime : null,

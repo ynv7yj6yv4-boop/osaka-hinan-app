@@ -19,6 +19,19 @@ export type NotificationDecisionConfig = {
   rainfallRankThreshold: number;
   hazardDepthRankThreshold: number;
   cooldownMinutes: number;
+  /**
+   * 【要件定義書3・このアプリの中心的な設計思想】
+   * 「大雨が予測されたので通知する」のではなく、「これから降り続けると
+   * 予測される総雨量が、道路の冠水を引き起こしうる規模かどうか」を判断して
+   * から通知する。この2つが、そのための予測総雨量ベースの判定パラメータ。
+   *
+   * 【重要・未確定】研究上の代理指標(proxy)の暫定候補であり、「この量が
+   * 降ったら実際に道路が冠水する」ことを検証済みの一次資料に基づくもの
+   * ではない。人間側の確認・承認が必要（詳細はlib/側の同名ファイル・
+   * data/README.md参照）。
+   */
+  totalRainfallWindowHours: number;
+  totalRainfallThresholdMm: number;
 };
 
 // 【重要】以下の数値は「研究用に比較検討している候補」であり、
@@ -32,4 +45,6 @@ export const notificationDecisionConfig: NotificationDecisionConfig = {
   rainfallRankThreshold: 6,
   hazardDepthRankThreshold: 1,
   cooldownMinutes: 60,
+  totalRainfallWindowHours: 24,
+  totalRainfallThresholdMm: 100,
 };

@@ -694,3 +694,49 @@ Firestoreへの接続・クエリが正常に動作することを確認済み�
   で`functions/src/index.ts`のCloud Functions版へ切り替えることを推奨する
   （タイミング精度・信頼性が向上するため）。その際、GitHub Actions側の
   ワークフローは無効化するか削除し、二重監視状態にしないこと。
+
+## 予測総雨量に基づく冠水リスク早期警戒（このアプリの中心的な設計思想）
+
+このアプリの新規性は、「大雨が予測されたので通知する」のではなく、
+「これから降り続けると予測される総雨量が、実際に道路の冠水を引き起こしうる
+規模かどうか」を判断してから、冠水が発生する前にユーザーへ通知することに
+ある。この設計思想を実装した。
+
+### 構成
+
+- `lib/floodRiskForecast.ts`（新規）: 指定地点について、今後windowHours時間
+  分の予測降水量の合計(mm)を取得する。Open-Meteo/JMA MSM
+  （`lib/rainfallForecastOpenMeteo.ts`、既存・検証済み。最大168時間先まで・
+  mm単位の実数値）をそのまま再利用しており、新しい取得ロジックは作っていない。
+- `lib/notificationDecision.ts`の`evaluateFloodRiskNotificationDecision()`
+  （新規）: 静的洪水ハザード(depthRank) かつ 予測総雨量(totalPredictedRainfallMm)
+  が候補条件を満たすかを判定する。既存の`evaluateNotificationDecision()`
+  （気象庁ナウキャストのrankベース、60分先までの瞬間的な強さを見る判定）とは
+  別の判定として共存させている（`enabled`マスタースイッチ・cooldown等の
+  多重防御はそのまま共有）。
+- `notificationDecisionConfig.ts`に`totalRainfallWindowHours`・
+  `totalRainfallThresholdMm`を追加。
+- `functions/src/monitoringCheck.ts`: 上記の予測総雨量ベースの判定を主判定
+  （`lastDecisionType`）とし、従来のナウキャストrankベース判定も比較・研究
+  目的で並行して評価・記録する（`lastLegacyRankDecisionType`）。
+
+### 重要な限界（卒論に明記すること）
+
+`totalPredictedRainfallMm`が閾値を超えることは、あくまで**研究上の代理指標
+(proxy)**であり、「実際にその地点の道路が冠水すること」を検証済みの物理
+モデル・実測データに基づいて判定するものではない。要件定義書3 §9・10で
+確認したとおり、洪水ハザードマップ(L2)の想定降雨条件を、河川・流域ごとに
+予測降雨と正しく対応付ける仕組みは現状存在しない（合成タイルからの逆引き
+不可）。このモジュールは、その制約を解消したわけではなく、静的ハザード
+（区域内かどうか）と予測総雨量という、入手可能なデータの組み合わせによる
+近似的な早期警戒の試みである。
+
+### 未確定・人間側の判断が必要な事項
+
+- `totalRainfallWindowHours`（何時間先までの総雨量を見るか）・
+  `totalRainfallThresholdMm`（何mm以上を冠水リスクとみなすか）は、
+  いずれも**未確定の暫定候補値**（24時間・100mm）である。防災の文脈で
+  しばしば言及される丸めた数字を仮に設定しているだけで、この地点で実際に
+  道路が冠水することを検証した一次資料ではない。
+- どちらの判定（予測総雨量ベース／ナウキャストrankベース）を本番採用するか
+  も未確定。
