@@ -13,8 +13,8 @@
 // ハザード判定用のコード（lib/riskAssessment.ts）とは役割を分離し、
 // タイル画像から色を読む共通処理（lib/tilePixel.ts）のみを共有しています。
 
-import { samplePixelFromTile } from "./tilePixel";
-import { matchRainfallColor } from "./rainfallColorLegend";
+import { samplePixelFromTile } from "./tilePixel.ts";
+import { matchRainfallColor } from "./rainfallColorLegend.ts";
 
 // 実況タイルの提供ズームレベル（気象庁の解説記事によれば4〜10）
 const NOWCAST_ZOOM = 10;
@@ -27,12 +27,31 @@ function buildTileUrlTemplate(basetime: string): string {
   return `https://www.jma.go.jp/bosai/jmatile/data/nowc/${basetime}/none/${basetime}/surf/hrpns/{z}/{x}/{y}.png`;
 }
 
-// "20260905195000" (YYYYMMDDHHMMSS, JST) -> "19:50"
-// 試作3: lib/rainfallForecast.ts（実況とは別モジュール）でも同じ表示形式を
-// 使うため、追加のみの変更としてexportする（挙動は変更していない）。
+// 【重要・バグ修正(2026-09-10)】当初このタイムスタンプを「JST」と仮定し、
+// HH:MM部分をそのまま切り出して表示していたが、実際にJMAのサーバーへ
+// 問い合わせて検証したところ、このタイムスタンプは**UTC**であることが判明した
+// （実際のfetch時刻(UTC)と、この関数が返す値をそのままJSTの時刻として
+// 表示した場合の差が、常にほぼ9時間になることを確認した）。
+// そのため、UTCとして解釈した上でJST(UTC+9)へ変換してから表示する。
+// 【影響範囲】この関数はlib/rainfallForecast.tsからも共有されている。表示用の
+// ラベルのみのバグであり、どのrunを取得するか・leadTimeMinutesの計算等
+// （lib/rainfallForecast.ts内のparseJmaTimeForDiffは元々UTCとして解釈しており
+// 影響を受けていない）には影響しない。
+//
+// "20260905195000" (YYYYMMDDHHMMSS, UTC) -> JSTの "HH:MM" (例: "04:50")
 export function formatJmaTimeAsClock(raw: string): string {
   if (raw.length !== 14) return raw;
-  return `${raw.slice(8, 10)}:${raw.slice(10, 12)}`;
+  const y = Number(raw.slice(0, 4));
+  const mo = Number(raw.slice(4, 6)) - 1;
+  const d = Number(raw.slice(6, 8));
+  const h = Number(raw.slice(8, 10));
+  const mi = Number(raw.slice(10, 12));
+  const s = Number(raw.slice(12, 14));
+  const jstMs = Date.UTC(y, mo, d, h, mi, s) + 9 * 60 * 60 * 1000;
+  const jst = new Date(jstMs);
+  const hh = String(jst.getUTCHours()).padStart(2, "0");
+  const min = String(jst.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${min}`;
 }
 
 export type RainfallObservationResult =

@@ -32,10 +32,22 @@ function parseJmaTimeForDiff(raw: string): number {
   return Date.UTC(y, mo, d, h, mi, s);
 }
 
-// lib/rainfallObservation.ts の formatJmaTimeAsClock と同じ実装(JST "HH:MM"表示用)
+// lib/rainfallObservation.ts の formatJmaTimeAsClock と同じ実装。
+// 【重要・バグ修正(2026-09-10)】このタイムスタンプはUTCであることが判明したため、
+// JST(UTC+9)へ変換してから表示する(詳細はlib/rainfallObservation.tsのコメント参照)。
 function formatJmaTimeAsClock(raw: string): string {
   if (raw.length !== 14) return raw;
-  return `${raw.slice(8, 10)}:${raw.slice(10, 12)}`;
+  const y = Number(raw.slice(0, 4));
+  const mo = Number(raw.slice(4, 6)) - 1;
+  const d = Number(raw.slice(6, 8));
+  const h = Number(raw.slice(8, 10));
+  const mi = Number(raw.slice(10, 12));
+  const s = Number(raw.slice(12, 14));
+  const jstMs = Date.UTC(y, mo, d, h, mi, s) + 9 * 60 * 60 * 1000;
+  const jst = new Date(jstMs);
+  const hh = String(jst.getUTCHours()).padStart(2, "0");
+  const min = String(jst.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${min}`;
 }
 
 export type RainfallForecastNodeResult =
