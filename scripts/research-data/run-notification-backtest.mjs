@@ -28,14 +28,16 @@ import { toBacktestHazardStatusLabel } from "../../lib/staticFloodHazardCapture.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 雨量閾値。当初Set C(1h=30/3h=60/6h=90、docs §2)で評価したところ、
-// 実際の観測データ(Period B最大1h=28.4mm等)がこの閾値を一度も超えず、
-// 全パターンでcandidateが0件になることを確認した(人間側承認済みの正しい結果)。
-// 比較評価が成立するよう、Set B(強い雨基準)へ変更して再評価する。
+// 雨量閾値。Set C(1h=30/3h=60/6h=90、docs §2)→ Set B(1h=20/3h=40/6h=60)の順に
+// 実データで比較した結果、Set Cは全パターンでcandidate 0件、Set Bは継続性条件を
+// 2以上にした瞬間に一気に0件になり、段階的な傾向が見えなかった。
+// Set A(1h=10/3h=20/6h=30、やや強い雨基準)で比較したところ、継続性条件を
+// 厳しくするほど候補数が滑らかに減少する(例: Period B 29→6→0)、研究として
+// 有用な段階的傾向が見られたため、人間側承認によりSet Aを最終採用する。
 const RAINFALL_THRESHOLDS = {
-  hourlyRainfallThresholdMm: 20,
-  accumulated3hThresholdMm: 40,
-  accumulated6hThresholdMm: 60,
+  hourlyRainfallThresholdMm: 10,
+  accumulated3hThresholdMm: 20,
+  accumulated6hThresholdMm: 30,
 };
 
 // 継続性条件、全9パターン(docs §4)。IETDは含めない(上記コメント参照)。
@@ -186,18 +188,26 @@ function main() {
     metadata: {
       generatedAt,
       gitCommit,
-      rainfallThresholdSet: "Set B(強い雨基準)",
+      rainfallThresholdSet: "Set A(やや強い雨基準)・最終採用",
       rainfallThresholds: RAINFALL_THRESHOLDS,
       persistencePatterns: PERSISTENCE_PATTERNS,
+      status: "final",
       note:
-        "docs/notification-backtest-experiment-design.md に基づくBacktest。IETDは今回除外" +
-        "(Single Runs API由来のForecast Run Datasetには適用できないため、人間側承認済み)。" +
-        "雨量閾値は当初Set C(1h=30/3h=60/6h=90)で評価したが、実際の観測データが" +
-        "一度もこの閾値を超えず全パターンでcandidate 0件だったため、Set B" +
-        "(1h=20/3h=40/6h=60、強い雨基準)へ変更して再評価した(人間側承認済み)。" +
-        "追加のAPI呼び出しは行っていない(取得済みデータの再評価のみ)。技術確認ではなく" +
-        "本実験地点(E001〜E024)による評価だが、雨量閾値・継続性条件・本実験期間の" +
-        "最終採用値はまだ確定していない(感度分析結果)。",
+        "docs/notification-backtest-experiment-design.md に基づく本Backtest(最終版)。" +
+        "雨量閾値はSet C(1h=30/3h=60/6h=90、全パターン0件)→Set B(1h=20/3h=40/6h=60、" +
+        "継続性条件2以上で一気に0件)の順に実データで比較した結果、Set A" +
+        "(1h=10/3h=20/6h=30)で継続性条件を厳しくするほど候補数が滑らかに減少する" +
+        "(例: Period B 29→6→0)、研究として有用な段階的傾向が見られたため、" +
+        "人間側承認によりSet Aを最終採用した。" +
+        "継続性条件は1つの値に決め打ちせず、9パターン全てを感度分析結果として" +
+        "採用する(人間側承認済み)。IETDは今回のBacktestには含めない" +
+        "(Single Runs API由来のForecast Run Datasetには適用できないため、" +
+        "人間側承認済み。Method1〜4の比較という主目的には影響しない)。" +
+        "対象期間はPeriod C・Period Bの現状2期間で確定し、延長しない" +
+        "(人間側承認済み)。追加のAPI呼び出しは行っていない" +
+        "(取得済みデータの再評価のみ)。雨量閾値・継続性条件・本実験期間は" +
+        "本Backtestの評価条件として確定したが、卒論の最終採用値そのもの" +
+        "(単一の推奨方式・推奨閾値)は、この感度分析結果を踏まえて別途決定する。",
       sourceDatasets: {
         periodC: "scripts/research-data/forecast-run-dataset-period-c-post-api-start.json",
         periodB: "scripts/research-data/forecast-run-dataset-period-b-baiu.json",

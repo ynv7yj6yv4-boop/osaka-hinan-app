@@ -1,8 +1,13 @@
 # 要件定義書3
 # Notification Backtest 本実験パラメータ設計
-# 承認済み（実行はまだ開始していない）
+# 実行完了・結果確定
 
-**ステータス: Approved — 実データ取得（Single Runs API呼び出し）は未実施**
+**ステータス: Completed — バッチ1・2のデータ取得、Backtest評価とも実行済み**
+
+【重要】本ドキュメントは当初「Approved（実行前）」として作成されたが、
+その後実際にバッチ1・2のデータ取得とBacktest評価を実行し、結果を踏まえて
+雨量閾値・継続性条件の扱いを確定した。変更点は各セクションに追記している。
+最終結果は §10 を参照。
 
 このドキュメントは、本実験地点（E001〜E024）確定後の次段階として、Backtestの
 実験パラメータ（期間・雨量閾値・IETD・継続性条件）を固定するものである。
@@ -66,28 +71,55 @@ staticFloodHazardによる通知抑制効果がどう変わるか」という比
 
 ---
 
-## 2. 雨量閾値（Set C: 激しい雨基準）
+## 2. 雨量閾値（最終採用: Set A・やや強い雨基準）
+
+【改訂履歴・重要】当初はSet C（激しい雨基準）を採用したが、実際にBacktestを
+実行した結果、Set Cは今回の2期間・24地点のいずれでも一度も閾値を超えず、
+全パターンでcandidate 0件になった。次にSet B（強い雨基準）で再評価したところ
+候補は発生したが、継続性条件を2以上にした瞬間に一気に0件になり、
+「条件を厳しくするほど段階的に減る」という研究上有用な傾向が見えなかった。
+最後にSet A（やや強い雨基準）で再評価したところ、継続性条件を厳しくするほど
+候補数が滑らかに減少する傾向（例: Period B 29→6→0）が見られたため、
+**人間側承認によりSet Aを最終採用した**。
 
 | 項目 | 値 | 根拠 |
 |---|---|---|
-| hourlyRainfallThresholdMm (1h) | **30mm** | 気象庁「雨の強さと降り方」表の「激しい雨」区分下限（`data/README.md`に出典記載済み: https://www.jma.go.jp/jma/kishou/know/yougo_hp/amehyo.html ） |
-| accumulated3hThresholdMm (3h) | **60mm** | 1hの3倍。**一次資料による独立の裏付けなし**（技術確認用の暫定設定(10/20/30mm)と同じ比率をそのまま踏襲した経験則） |
-| accumulated6hThresholdMm (6h) | **90mm** | 1hの6倍。同上、独立の裏付けなし |
+| hourlyRainfallThresholdMm (1h) | **10mm** | 気象庁「雨の強さと降り方」表の「やや強い雨」区分下限（`data/README.md`に出典記載済み: https://www.jma.go.jp/jma/kishou/know/yougo_hp/amehyo.html ） |
+| accumulated3hThresholdMm (3h) | **20mm** | 1hの2倍。**一次資料による独立の裏付けなし**（技術確認用の暫定設定と同じ比率を踏襲した経験則） |
+| accumulated6hThresholdMm (6h) | **30mm** | 1hの3倍。同上、独立の裏付けなし |
 
 **重要な限界（卒論に明記すること）**: 3h・6hの値は大阪市固有の公式警報基準等の
-一次資料から個別に確認したものではなく、1h値からの比例計算にすぎない。この点は
-研究の限界として正直に記載する。
+一次資料から個別に確認したものではなく、1h値からの比例計算にすぎない。
+また、Set A・B・Cのどれが「正しい」かの一次資料的な結論は出ておらず、
+今回はあくまで「段階的な傾向を観察しやすい」という研究上の理由でSet Aを
+選んでいる。この選定理由自体を研究の限界として正直に記載する。
+
+### 参考: 他の閾値セットとの比較（Method1〜4の候補数合計、24地点、fh1-rr1条件）
+
+| Set | 1h/3h/6h | Period C | Period B |
+|---|---|---|---|
+| Set A（採用） | 10/20/30mm | Method1=62, Method2=36, Method3=22 | Method1=50, Method2=35, Method3=29 |
+| Set B | 20/40/60mm | Method1=24, Method2=12, Method3=12 | Method1=23, Method2=11, Method3=11 |
+| Set C | 30/60/90mm | 全Method 0件 | 全Method 0件 |
 
 ---
 
-## 3. IETD（無降雨とみなす時間）
+## 3. IETD（無降雨とみなす時間）: 今回のBacktestからは除外（人間側承認済み）
 
-```
-3時間 と 6時間 の2値で比較する
-```
+【改訂履歴・重要】当初は3時間・6時間の2値を比較する予定だったが、IETDは
+`lib/notificationExperimentMetrics.ts`の`splitIntoRainfallEvents()`で使う値であり、
+これはHistorical Forecast API由来の「連続した時間別降水量配列」（Rain Event
+Dataset）を降雨イベントに分割するためのものである。一方、今回バッチ1・2で
+取得したデータはSingle Runs API由来の「run単位の予報スナップショット」
+（Forecast Run Dataset）であり、連続した実況の時系列ではないため、IETDを
+適用する対象がそもそも存在しないことが実装時に判明した
+（要件定義書3 §53・54のデータセット役割分離どおり）。
 
-水文学的に統一された正解値はないため、単一値に固定せず2値を比較する
-（要件定義書3 §55の方針を踏襲）。
+人間側の承認により、IETDは今回のBacktestから除外した。Method1〜4の候補判定・
+抑制効果比較という主目的にはIETDは使われていないため、この除外は主結果に
+影響しない。IETDベースの降雨イベント分析（雨天日あたりの通知数等）を
+将来行う場合は、Historical Forecast APIで24地点×対象期間分の連続時系列を
+別途取得する追加作業が必要になる。
 
 ---
 
@@ -103,11 +135,14 @@ staticFloodHazardによる通知抑制効果がどう変わるか」という比
 
 ---
 
-## 5. experimentConfigの総数
+## 5. experimentConfigの総数（改訂: IETD除外後）
 
 ```
-IETD(2) × persistence(9) = 18通りのexperimentConfig
+persistence(9パターン) = 9通りのexperimentConfig
 ```
+
+（当初はIETD(2) × persistence(9) = 18通りを想定していたが、§3のとおりIETDは
+除外したため、最終的には継続性条件9パターンのみとなった。）
 
 各experimentConfigを、Period B・Period Cそれぞれ、24地点・4方式(Method1〜4)に
 適用する。
@@ -180,9 +215,59 @@ Open-Meteoの無料枠（[公式Pricing](https://open-meteo.com/en/pricing)）:
 
 ---
 
-## 9. Decision Required（次Stepで人間が決定する内容）
+## 9. Decision Required（解決済み）
 
-- [ ] バッチ1（Period C、5,760回のAPI呼び出し）の実行を、いつ開始するか
-- [ ] バッチ2（Period B、6,720回のAPI呼び出し）を、バッチ1から何日空けて実行するか
-- [ ] 取得したraw予報データをGitへコミットする方針でよいか（ファイルサイズが
-  数MB程度になる見込み）
+- [x] バッチ1（Period C、4,224回のAPI呼び出し）の実行タイミング → 承認時点で即実行
+- [x] バッチ2（Period B、6,720回のAPI呼び出し）の実行タイミング → 人間側の指示するタイミング（バッチ1から約24時間後）で実行
+- [x] 取得したraw予報データをGitへコミットする方針 → 承認。両バッチともコミット済み
+  （commit `139630d` Period C, commit `8e342d4` Period B）
+- [x] 雨量閾値の最終採用値 → Set A（§2参照）
+- [x] 継続性条件の最終採用値 → 単一値に決め打ちせず、9パターン全てを感度分析結果として採用
+- [x] 本実験期間の最終確定 → 現状の2期間（Period C・B）で確定し延長しない
+- [x] IETDの扱い → 今回のBacktestからは除外（§3参照）
+
+---
+
+## 10. 最終結果（Backtest実行結果サマリ）
+
+実行コミット: `5ecb4eb`（`scripts/research-data/run-notification-backtest.mjs`
+実行、その後Set A採用に伴い再実行・結果を最終化）。
+結果ファイル: `scripts/research-data/notification-backtest-experiment-results.json`
+
+### 候補数の合計（24地点、Set A、fh1-rr1〜fh3-rr3の傾向）
+
+| Method | Period C | Period B（梅雨） |
+|---|---|---|
+| Method1（雨だけ、比較対照） | 62 | 50 |
+| Method2（hazard+雨） | 36 | 35 |
+| Method3（+状態変化） | 22 | 29 |
+| Method4（+継続性、fh1-rr1） | 22 | 29 |
+| Method4（+継続性、fh2-rr2） | 12 | 6 |
+| Method4（+継続性、fh3-rr3） | 14 | 0 |
+
+### 分かったこと
+
+1. **staticFloodHazardによる抑制効果**: Method1→Method2で候補数が明確に減少
+   （Period C: 62→36、Period B: 50→35）。地点別に確認したところ、outside判定
+   地点では候補が発生せず、hazard判定地点でのみ候補が発生しており、
+   ハザードゲートが設計どおり機能していることを確認した。
+2. **状態変化による重複抑制効果**: Method2→Method3でさらに候補数が減少
+   （Period C: 36→22、Period B: 35→29）。同一の降雨継続中に重複して
+   候補化することを防ぐ効果を確認した。
+3. **継続性条件による段階的な抑制**: Method4は継続性条件を厳しくするほど
+   候補数が滑らかに減少する（Period B: 29→6→0）。これは閾値をSet Aにした
+   ことで観測できた、研究上有用な傾向である（Set Bでは同じ傾向が
+   段階的に見えず、条件を2以上にした瞬間に一気に0件になっていた）。
+
+### 卒論の限界として明記すべき事項
+
+- 雨量閾値（Set A: 1h=10mm/3h=20mm/6h=30mm）は気象庁の「やや強い雨」区分に
+  基づくが、3h・6hの値は独立した一次資料の裏付けがない比例計算値である。
+- IETDは今回のBacktestには含まれていない（Single Runs API由来のデータには
+  適用できないため）。
+- 対象期間はPeriod C（2026-05-13〜06-03）・Period B（2026-06-04〜07-08）の
+  57日間のみであり、これ以外の季節（真夏・台風シーズン・冬季等）の傾向は
+  未検証である。
+- 本実験地点（E001〜E024）は大阪市の指定緊急避難場所データを母集団とした
+  層化無作為抽出によるものであり、一般ユーザーの居住地・現在地を代表する
+  標本ではない（`docs/research-location-sampling-design.md` §4参照）。
