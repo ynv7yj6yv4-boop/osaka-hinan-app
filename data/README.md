@@ -654,3 +654,43 @@ P004=hazard/depthRank2、すべて一致）。
   予測タイル）自体、色→mm/hの対応が状況証拠の組み合わせであり一次資料による
   確認ではないという限界を抱えたまま（Backtest研究で使ったOpen-Meteo/JMA MSM
   とは別の情報源であることに注意）。
+
+## 定期監視の実行方法（Blazeプラン未課金のためGitHub Actionsを暫定採用）
+
+方式Aの実装後、実際にFirebase Functionsへデプロイしようとしたところ、
+Cloud Functions（2nd gen）のデプロイにはBlazeプラン（従量課金制）が必須で
+あることが判明した（要件定義書2 §29で既知だった制約）。人間側の判断により、
+**現時点では課金せず、無料のGitHub Actionsで代替する**運用にしている。
+
+### 構成
+
+- `functions/src/monitoringCheck.ts`: 監視地点の確認ロジック本体
+  （Cloud Functions版・スタンドアロン版で共有。判定ロジックは同一）。
+- `functions/src/index.ts`: Cloud Functions版（`onSchedule`）。
+  **現時点ではデプロイしていない**が、将来Blazeへ課金した際にそのまま
+  デプロイできるようコードは維持している。
+- `functions/src/runStandalone.ts`: GitHub Actionsから呼び出す単体実行版。
+  Cloud Functions実行環境の自動認証が無いため、環境変数
+  （`FIREBASE_ADMIN_PROJECT_ID`・`FIREBASE_ADMIN_CLIENT_EMAIL`・
+  `FIREBASE_ADMIN_PRIVATE_KEY`。Next.jsアプリの`lib/firebaseAdmin.ts`と
+  同じ形）から明示的にサービスアカウント認証情報を組み立てる。
+- `.github/workflows/check-monitoring-points.yml`: 5分間隔のスケジュール
+  実行（`workflow_dispatch`による手動実行も可能）。
+
+### 検証済み
+
+`runStandalone.ts`を実際のFirebaseプロジェクトの認証情報で実行し、
+Firestoreへの接続・クエリが正常に動作することを確認済み（2026-09-09時点、
+登録済み監視地点0件のため`checked=0`）。
+
+### 既知の制約（必ず理解して運用すること）
+
+- GitHub Actionsの高頻度スケジュール（5分間隔等）は、公式ドキュメントで
+  「高負荷時に数分〜十数分遅れる場合がある」と明記されている。Cloud
+  Schedulerのような高精度は保証されない。
+- **60日間リポジトリへの操作（コミット等）が無いと、スケジュール実行が
+  自動的に無効化される**（GitHub Actionsの既知の仕様）。定期的な操作が必要。
+- 将来Blazeプランへアップグレードした場合は、`firebase deploy --only functions`
+  で`functions/src/index.ts`のCloud Functions版へ切り替えることを推奨する
+  （タイミング精度・信頼性が向上するため）。その際、GitHub Actions側の
+  ワークフローは無効化するか削除し、二重監視状態にしないこと。

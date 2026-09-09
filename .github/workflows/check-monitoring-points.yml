@@ -1,0 +1,57 @@
+# 要件定義書3: Firebase Cloud Functions(Blazeプラン必須)の代わりに、
+# 無料のGitHub Actionsスケジュール実行で監視地点の定期確認を行う。
+#
+# 【重要・このワークフローの位置づけ】
+# - Firebaseプロジェクトが現在Sparkプラン(無料)のため、Cloud Scheduler/
+#   Cloud Functions(2nd gen)がデプロイできない(Blazeプラン必須)。
+#   人間側の判断により、当面はこちらの無料の代替手段を使う運用にしている。
+# - 判定ロジック自体はfunctions/src/monitoringCheck.tsを使用しており、
+#   Cloud Functions版(functions/src/index.ts)と完全に同じ。
+# - notificationDecisionConfig.enabled は false のため、このワークフローが
+#   実行されても実際のPush通知(FCM送信)にはつながらない(多重防御)。
+#
+# 【既知の制約(必ず理解した上で使うこと)】
+# - GitHub Actionsの公式ドキュメントにより、5分間隔等の高頻度スケジュールは
+#   高負荷時に数分〜十数分遅れる場合があると明記されている。正確な間隔の
+#   保証は無い。
+# - 60日間リポジトリへの操作(コミット等)が無いと、スケジュール実行は
+#   自動的に無効化される(GitHub Actionsの既知の仕様)。定期的な操作が必要。
+#
+# 【必要なGitHub Secrets】(リポジトリのSettings > Secrets and variables > Actions)
+# - FIREBASE_ADMIN_PROJECT_ID
+# - FIREBASE_ADMIN_CLIENT_EMAIL
+# - FIREBASE_ADMIN_PRIVATE_KEY
+# (値はNext.jsアプリ側の.env.localと同じFirebaseサービスアカウントの
+#  認証情報。秘密鍵内の改行はそのまま貼り付けてよい
+#  - functions/src/runStandalone.tsが"\n"エスケープ・実改行の両方に対応)
+
+name: Check Monitoring Points
+
+on:
+  schedule:
+    # 5分おき。ただし上記の既知の制約により、実際にはこれより遅れることがある。
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # 手動実行・動作確認用
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm run check:standalone
+        env:
+          FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
