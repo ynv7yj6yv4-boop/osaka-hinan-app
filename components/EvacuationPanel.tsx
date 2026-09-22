@@ -91,8 +91,10 @@ export default function EvacuationPanel({
   const [routeLog, setRouteLog] = useState<RouteJudgmentLog | null>(null);
 
   useEffect(() => {
+    // candidatesLoadingはuseState(true)で既に初期値trueであり、このeffectは
+    // マウント時に一度だけ実行される(依存配列は空)ため、ここで改めて
+    // setCandidatesLoading(true)を呼ぶ必要はない(常にno-opだった)。
     let cancelled = false;
-    setCandidatesLoading(true);
     findFloodShelterCandidates(position).then((result) => {
       if (cancelled) return;
       setCandidatesLoading(false);

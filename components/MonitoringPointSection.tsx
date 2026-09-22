@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { requestFcmToken } from "@/lib/firebaseClient";
 import {
   getSavedMonitoringPointId,
+  getSavedMonitoringPointToken,
   registerMonitoringPoint,
   fetchMonitoringPoint,
   deleteMonitoringPoint,
@@ -23,17 +24,26 @@ export default function MonitoringPointSection({ position }: { position: { lat: 
   // localStorageの読み取りは同期処理のため、useStateの初期値として直接
   // 評価する(IntroPanel.tsxのisIosSafariNotStandaloneと同じ方針)。
   // これにより、effect内で同期的にsetStateを呼ぶ必要がなくなる。
-  const [step, setStep] = useState<Step>(() => (getSavedMonitoringPointId() ? "loading" : "not-registered"));
+  // 【2026-09-10 追記】GET側にも所有者確認(fcmToken一致)が必要になったため、
+  // IDだけでなくトークンも保存されている場合のみ"loading"にする
+  // (トークンが無い場合はfetchMonitoringPoint自体を呼べないため)。
+  const [step, setStep] = useState<Step>(() =>
+    getSavedMonitoringPointId() && getSavedMonitoringPointToken() ? "loading" : "not-registered"
+  );
   const [info, setInfo] = useState<MonitoringPointInfo | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const id = getSavedMonitoringPointId();
-    if (!id) return; // 上のuseStateで既にnot-registeredになっている
+    const token = getSavedMonitoringPointToken();
+    // 上のuseStateの初期値と同じ条件。片方でも欠けていれば既に
+    // "not-registered"になっている(起動直後にrequestFcmToken()を呼んで
+    // 通知許可プロンプトを出すこと(PART C-3で禁止)はしない)。
+    if (!id || !token) return;
 
     let cancelled = false;
-    fetchMonitoringPoint(id).then((result) => {
+    fetchMonitoringPoint(id, token).then((result) => {
       if (cancelled) return;
       if (result) {
         setInfo(result);
@@ -70,7 +80,7 @@ export default function MonitoringPointSection({ position }: { position: { lat: 
       setBusy(false);
       return;
     }
-    const details = await fetchMonitoringPoint(result.id);
+    const details = await fetchMonitoringPoint(result.id, tokenResult.token);
     setInfo(details);
     setStep("registered");
     setBusy(false);

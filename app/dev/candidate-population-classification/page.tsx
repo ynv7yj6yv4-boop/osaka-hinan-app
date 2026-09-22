@@ -29,8 +29,6 @@ export default function CandidatePopulationClassificationPage() {
   const [summary, setSummary] = useState<{ hazardCount: number; outsideCount: number; unknownCount: number } | null>(
     null
   );
-  const resultsRef = { current: [] as ResultRow[] };
-
   if (process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS !== "1") {
     return (
       <main className="p-6 text-sm text-zinc-600">
@@ -95,7 +93,6 @@ export default function CandidatePopulationClassificationPage() {
       window.fetch = originalFetch;
     }
 
-    resultsRef.current = results;
     setSummary({
       hazardCount: results.filter((r) => r.pixel?.status === "hazard").length,
       outsideCount: results.filter((r) => r.pixel?.status === "outside").length,

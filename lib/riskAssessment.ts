@@ -3,7 +3,7 @@
 // 設計方針（ユーザーとの合意事項）:
 // - 洪水・内水氾濫のハザードタイル画像の色を読み取り、浸水深ランクを判定する
 //   （試作2以降、高潮は研究対象から除外したためRiskLevel算出には使用しない。
-//   下記assessRisk内のhazardKeys参照。データ・タイル取得ロジック自体は
+//   下記HAZARD_KEYS参照。データ・タイル取得ロジック自体は
 //   components/hazardLayers.ts に残しており、削除はしていない）
 // - リアルタイムの降雨・河川水位・気象警報は「まだ使えないデータ」として明示し、
 //   将来のPhaseで追加できるよう、判定要素(RiskFactor)を配列で拡張できる構造にしている
@@ -13,12 +13,16 @@
 //   であることが伝わるよう、行動を指示する言い回し（「避難準備」等）を避け、
 //   リスクの高さを表す言い回しにしている（内部の型名・キー名は変更していない）
 
-import { HAZARD_BUTTONS, HAZARD_TILE_URL, type HazardKey } from "@/components/hazardLayers";
-import { classifyHazardPixel, type HazardPixelStatus } from "./hazardPixelClassifier";
-import type { DepthRank } from "./hazardColorLegend";
-import { fetchElevation } from "./elevation";
-import { fetchRainfallObservation, type RainfallObservationResult } from "./rainfallObservation";
-import { buildJudgmentLog, type JudgmentLog } from "./judgmentLog";
+// 【重要】"@/"エイリアスではなく相対パスでimportしている(挙動は同一)。
+// Next.js側のbundlerは"@/"でも解決できるが、node --test（lib/*.test.ts）は
+// tsconfig.jsonの"paths"を解釈しないため、テストから直接importできるよう
+// 他のlib/*.ts（例: staticFloodHazardCapture.ts）と同じ相対パス方式に揃えた。
+import { HAZARD_BUTTONS, HAZARD_TILE_URL, type HazardKey } from "../components/hazardLayers.ts";
+import { classifyHazardPixel, type HazardPixelStatus } from "./hazardPixelClassifier.ts";
+import type { DepthRank } from "./hazardColorLegend.ts";
+import { fetchElevation, type ElevationResult } from "./elevation.ts";
+import { fetchRainfallObservation, type RainfallObservationResult } from "./rainfallObservation.ts";
+import { buildJudgmentLog, type JudgmentLog } from "./judgmentLog.ts";
 
 export type RiskLevel = "unknown" | "safe" | "caution" | "prepare" | "evacuate";
 
@@ -69,7 +73,7 @@ export type RiskResult = {
   generatedAt: string;
   // Phase5A.3: 洪水・内水氾濫のうち、何件を実際に判定できたかを示す
   // （試作2で高潮を対象から除外したため、Phase5A.3時点の「3件中」から
-  //   「2件中」に変わった。下記assessRisk内のhazardKeys参照）。
+  //   「2件中」に変わった。下記HAZARD_KEYS参照）。
   // "unavailable"（全件unknown）の場合、levelは"unknown"になる。
   // "partial"の場合でも、判定できたハザードの情報でlevelを算出する
   // （unknownの存在によって既知のリスクを引き下げない）。
@@ -111,11 +115,6 @@ function toHazardAssessment(pixel: HazardPixelStatus): HazardAssessment {
   return { status: "unknown", rank: 0, reason: pixel.reason };
 }
 
-async function assessHazard(hazard: HazardKey, lat: number, lng: number): Promise<HazardAssessment> {
-  const pixel = await classifyHazardPixel(HAZARD_TILE_URL[hazard], lat, lng);
-  return toHazardAssessment(pixel);
-}
-
 function hazardReasonText(hazard: HazardKey, r: HazardAssessment): string {
   const label = HAZARD_LABELS[hazard];
   if (r.status === "evaluated") {
@@ -149,22 +148,38 @@ const RECOMMENDATION_TEXT: Record<RiskLevel, string> = {
   evacuate: "この場所は特に深刻な浸水が想定されています。災害発生時は速やかな避難を検討してください。",
 };
 
-export async function assessRisk(lat: number, lng: number): Promise<RiskResult> {
-  // 試作2（要件定義書2 §5・§31③）: 高潮を研究対象から除外したため、
-  // RiskLevel・assessmentCompletenessの算出対象は洪水・内水氾濫の2つのみとする。
-  // 【重要】これはUI表示だけを隠すのではなく、算出そのものから高潮を外すことで、
-  // 「画面に出ないだけで内部判定には使われている」状態を防ぐための変更。
-  // 高潮のタイルURL・判定関数自体は components/hazardLayers.ts に残している
-  // （完全削除はしない。将来的な再対応や他機能からの参照に備える）。
-  const hazardKeys: HazardKey[] = ["flood", "inundation"];
+// 試作2（要件定義書2 §5・§31③）: 高潮を研究対象から除外したため、
+// RiskLevel・assessmentCompletenessの算出対象は洪水・内水氾濫の2つのみとする。
+// 【重要】これはUI表示だけを隠すのではなく、算出そのものから高潮を外すことで、
+// 「画面に出ないだけで内部判定には使われている」状態を防ぐための変更。
+// 高潮のタイルURL・判定関数自体は components/hazardLayers.ts に残している
+// （完全削除はしない。将来的な再対応や他機能からの参照に備える）。
+const HAZARD_KEYS: HazardKey[] = ["flood", "inundation"];
 
-  // 静的ハザード判定・標高・降雨実況は互いに独立しているため並行取得する。
-  // 降雨の取得に失敗しても、静的ハザード判定（Phase3の評価）には一切影響しない。
-  const [hazardResults, elevation, rainfall] = await Promise.all([
-    Promise.all(hazardKeys.map((key) => assessHazard(key, lat, lng))),
-    fetchElevation(lat, lng),
-    fetchRainfallObservation(lat, lng),
-  ]);
+/**
+ * assessRisk()の中核となる、ネットワーク非依存の判定ロジック。
+ *
+ * 【テスト容易性のための分離（2026-09-10）】assessRisk()は
+ * classifyHazardPixel/fetchElevation/fetchRainfallObservationを直接呼び出して
+ * しまうため、単体テストではネットワークのモックが必要になる構造だった。
+ * この関数はそれらを呼び出さず、既に取得済みの結果を受け取って判定するだけの
+ * 純粋関数にすることで、実際のタイル取得無しに判定ロジックだけを検証できる
+ * ようにしている（依存性注入）。判定ロジック自体は一切変更していない
+ * （assessRisk()の元の実装をそのまま移しただけ）。
+ *
+ * hazardPixelsはHAZARD_KEYS（["flood", "inundation"]）と同じ順序で渡すこと。
+ */
+export function buildRiskResult(params: {
+  lat: number;
+  lng: number;
+  hazardPixels: HazardPixelStatus[];
+  elevation: ElevationResult;
+  rainfall: RainfallObservationResult;
+  /** テストでの再現性のため。省略時はnew Date().toISOString()（既存挙動）。 */
+  generatedAt?: string;
+}): RiskResult {
+  const { lat, lng, elevation, rainfall } = params;
+  const hazardResults = params.hazardPixels.map(toHazardAssessment);
 
   const factors: RiskFactor[] = [];
   const reasons: string[] = [];
@@ -177,7 +192,7 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
   // 重要: 一部のハザードがunknownでも、判定できた他のハザードの情報は失われない
   // （例: 洪水=判定成功・内水氾濫=unknown なら、洪水の情報でlevelを決め、
   //   内水氾濫は「確認できません」として別途表示するのみ）。
-  hazardKeys.forEach((key, i) => {
+  HAZARD_KEYS.forEach((key, i) => {
     const r = hazardResults[i];
     if (r.status === "evaluated") {
       determinedCount++;
@@ -196,7 +211,7 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
   });
 
   const assessmentCompleteness: AssessmentCompleteness =
-    determinedCount === hazardKeys.length ? "complete" : determinedCount === 0 ? "unavailable" : "partial";
+    determinedCount === HAZARD_KEYS.length ? "complete" : determinedCount === 0 ? "unavailable" : "partial";
 
   if (elevation.available) {
     factors.push({
@@ -261,9 +276,21 @@ export async function assessRisk(lat: number, lng: number): Promise<RiskResult> 
     recommendation: RECOMMENDATION_TEXT[level],
     disclaimers,
     position: { lat, lng },
-    generatedAt: new Date().toISOString(),
+    generatedAt: params.generatedAt ?? new Date().toISOString(),
     assessmentCompleteness,
     rainfall,
     judgmentLog,
   };
+}
+
+export async function assessRisk(lat: number, lng: number): Promise<RiskResult> {
+  // 静的ハザード判定・標高・降雨実況は互いに独立しているため並行取得する。
+  // 降雨の取得に失敗しても、静的ハザード判定（Phase3の評価）には一切影響しない。
+  const [hazardPixels, elevation, rainfall] = await Promise.all([
+    Promise.all(HAZARD_KEYS.map((key) => classifyHazardPixel(HAZARD_TILE_URL[key], lat, lng))),
+    fetchElevation(lat, lng),
+    fetchRainfallObservation(lat, lng),
+  ]);
+
+  return buildRiskResult({ lat, lng, hazardPixels, elevation, rainfall });
 }

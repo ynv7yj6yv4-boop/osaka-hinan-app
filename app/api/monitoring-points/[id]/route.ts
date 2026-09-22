@@ -1,9 +1,15 @@
 // 試作3 PART D: 通知対象地点の取得・削除・有効/無効切り替え。
 //
 // 【重要】このアプリにはユーザーアカウント(ログイン)の仕組みがない。
-// そのため、削除・更新の際は「登録時に使ったfcmTokenと一致するか」を
+// そのため、取得・削除・更新のいずれも「登録時に使ったfcmTokenと一致するか」を
 // 簡易的な所有確認として使う(研究用プロトタイプとしての現実的な範囲の対策。
 // 強固な認証ではないことを明記しておく)。
+//
+// 【2026-09-10 追記】GETのみ所有者確認が無く、緯度経度・通知状態を誰でも
+// 参照できてしまっていたため、DELETE/PATCHと同じverifyOwnership()による
+// 確認を追加した(位置情報を含むAPIのため)。GETはリクエストボディを持たない
+// 前提のクライアントもあるため、fcmTokenは "x-fcm-token" ヘッダーで受け取る
+// (DELETE/PATCHはボディで受け取る既存の方式のまま変更していない)。
 
 import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
@@ -39,12 +45,18 @@ async function verifyOwnership(
   return { ok: true };
 }
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  const fcmToken = request.headers.get("x-fcm-token");
+
+  const check = await verifyOwnership(id, fcmToken);
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
+
   try {
     const db = getAdminFirestore();
     const snap = await db.collection("monitoringPoints").doc(id).get();
     if (!snap.exists) {
+      // verifyOwnership()の直後で通常は起こらないが、その間に削除された場合の防御。
       return NextResponse.json({ error: "監視地点が見つかりません" }, { status: 404 });
     }
     const data = snap.data() as MonitoringPointDoc;

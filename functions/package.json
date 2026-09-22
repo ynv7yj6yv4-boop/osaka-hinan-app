@@ -15,7 +15,7 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "check:standalone": "node lib/runStandalone.js",
-    "test": "node --test lib_test/*.test.js"
+    "test": "npm run build && node --test lib/*.test.js"
   },
   "dependencies": {
     "firebase-admin": "14.3.0",
