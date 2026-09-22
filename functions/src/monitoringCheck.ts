@@ -176,6 +176,7 @@ export async function runMonitoringCheck(db: Firestore, deps: MonitoringCheckDep
         sendResult: sendOutcome.sendResult,
         sendErrorCode: sendOutcome.sendErrorCode,
         autoDisabledPoint: sendOutcome.autoDisabledPoint,
+        executionMode: "normal",
       };
       // notificationLogsは横断集計・研究分析のしやすさを優先し、トップレベル
       // コレクションとする(monitoringPoints/{id}/logsのサブコレクションにしない)。

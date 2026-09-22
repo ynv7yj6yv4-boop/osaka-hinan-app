@@ -15,3 +15,13 @@ export const notificationMessageDraft = {
     "最新の気象情報・お住まいの自治体からの避難情報をご確認ください。" +
     "これは避難指示ではなく、確認を促すための情報提供です。",
 } as const;
+
+// 要件定義書4後続(開発者限定自動通知パイプライン検証): devSimulationCheck.ts
+// 専用の文言。実際の気象データによる通知(notificationMessageDraft)と
+// 見た目で明確に区別できるようにする(実際の災害通知との誤認を防ぐ)。
+export const notificationMessageSimulationDraft = {
+  title: "【テスト】浸水リスク通知シミュレーション",
+  body:
+    "これは開発者向けのシミュレーション通知であり、実際の気象データ・実際の" +
+    "災害情報ではありません。自動通知パイプラインの疎通確認のために送信されています。",
+} as const;

@@ -15,6 +15,7 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "check:standalone": "node lib/runStandalone.js",
+    "check:dev-simulation": "node lib/runDevSimulation.js",
     "test": "npm run build && node --test lib/*.test.js"
   },
   "dependencies": {

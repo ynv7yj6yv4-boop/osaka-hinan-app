@@ -22,6 +22,13 @@ export type NotificationLogDoc = {
   sendResult: "success" | "failed" | null;
   sendErrorCode: string | null;
   autoDisabledPoint: boolean;
+  /**
+   * 要件定義書4後続(開発者限定自動通知パイプライン検証): 実際の気象データに
+   * 基づく通常の自動監視なら"normal"、開発者が明示操作で実行した
+   * シミュレーション(devSimulationCheck.ts)なら"simulation"。
+   * 後から研究データとして両者を区別できるようにするための最小限のフィールド。
+   */
+  executionMode: "normal" | "simulation";
 };
 
 /**
