@@ -12,6 +12,9 @@ import EvacuationPanel from "./EvacuationPanel";
 import IntroPanel from "./IntroPanel";
 import NavTracker from "./NavTracker";
 import NavigationOverlay from "./NavigationOverlay";
+import Button from "./ui/Button";
+import Notice from "./ui/Notice";
+import { LocationIcon, ChevronDownIcon } from "./ui/icons";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
 import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
@@ -387,11 +390,11 @@ export default function MapView() {
               しまうため、ユーザーとの合意により横向き時のみ非表示にする
               （縦向きの表示は変更なし。免責自体を削除するわけではなく、
               RiskDetailModal等で引き続き確認できる）。 */}
-          <div className="pointer-events-auto rounded-xl bg-white/95 px-3 py-1.5 shadow [@media(orientation:landscape)]:hidden">
-            <h1 className="text-sm font-bold leading-tight text-zinc-900">
+          <div className="pointer-events-auto rounded-[var(--radius-md)] bg-[var(--color-surface)]/95 px-3.5 py-2 shadow-[var(--shadow-sm)] [@media(orientation:landscape)]:hidden">
+            <h1 className="text-sm font-bold leading-tight text-[var(--color-text-primary)]">
               大阪市 避難支援マップ
             </h1>
-            <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">
+            <p className="mt-0.5 text-[11px] leading-snug text-[var(--color-text-muted)]">
               ※参考情報です。公式情報も必ずご確認ください。
             </p>
           </div>
@@ -403,8 +406,10 @@ export default function MapView() {
           )}
 
           {position && areaCheck === "clearly_outside" && (
-            <div className="pointer-events-auto rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 shadow">
-              現在地は大阪市エリアから明らかに離れている可能性があります。本アプリは大阪市を対象としており、表示される情報は実際と異なります。
+            <div className="pointer-events-auto">
+              <Notice tone="warning" title="現在地は大阪市エリアから離れている可能性があります">
+                本アプリは大阪市を対象としており、表示される情報は実際と異なる場合があります。
+              </Notice>
             </div>
           )}
 
@@ -415,7 +420,7 @@ export default function MapView() {
               「明らかに大阪市外」の警告(clearly_outside)は安全上重要なため、
               横向きでも引き続き表示する。 */}
           {position && areaCheck === "likely_osaka_or_nearby" && (
-            <div className="pointer-events-auto rounded-lg border border-zinc-300 bg-white/95 px-3 py-1 text-xs text-zinc-600 shadow [@media(orientation:landscape)]:hidden">
+            <div className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 px-3 py-1.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)] [@media(orientation:landscape)]:hidden">
               現在は大阪市を対象としています（市外では情報が不正確な場合があります）
             </div>
           )}
@@ -441,60 +446,59 @@ export default function MapView() {
                   控えめにする（洪水対応機能そのものは非表示にしない）。
                   試作2: 高潮を対象から除外したため、文言も内水氾濫のみに変更。 */}
               {floodIsNotThePrimaryHazard && (
-                <p className="mb-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 shadow">
-                  ⚠ 現在の危険度は主に内水氾濫によるものです。下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
-                </p>
+                <div className="mb-1.5">
+                  <Notice tone="warning" title="現在の危険度は主に内水氾濫によるものです">
+                    下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
+                  </Notice>
+                </div>
               )}
-              <button
-                type="button"
+              <Button
                 onClick={() => setShowEvacuationPanel(true)}
-                className={
-                  floodIsNotThePrimaryHazard
-                    ? "w-full rounded-lg border-2 border-zinc-400 bg-white py-3 text-base font-bold text-zinc-700 shadow active:bg-zinc-50"
-                    : "w-full rounded-lg bg-emerald-700 py-3 text-base font-bold text-white shadow active:bg-emerald-800"
-                }
+                variant={floodIsNotThePrimaryHazard ? "secondary" : "primary"}
+                fullWidth
+                size="lg"
               >
-                🏃 洪水時の避難先候補を見る
-              </button>
+                洪水時の避難先候補を見る
+              </Button>
             </div>
           )}
 
           {/* 試作2: 常時2行分の高さを占めていたハザード切替を折りたたみ式にし、
               既定では閉じておく（地図優先）。選択肢は高潮除外により3択に変更。
               試作3: 全幅バーではなく、地図に浮かせた小型カードに変更。 */}
-          <div className="pointer-events-auto rounded-xl bg-white/95 shadow">
+          <div className="pointer-events-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 shadow-[var(--shadow-sm)]">
             <button
               type="button"
               onClick={() => setHazardPanelOpen((v) => !v)}
               aria-expanded={hazardPanelOpen}
               aria-controls="hazard-toggle-panel"
-              className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-bold text-zinc-700"
+              className="flex w-full min-h-11 items-center justify-between px-3.5 py-2.5 text-sm font-bold text-[var(--color-text-primary)]"
             >
               <span>
-                🗺️ ハザード表示：
+                ハザード表示：
                 {activeHazard
-                  ? `${DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.emoji ?? ""} ${
-                      DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
-                    }`
+                  ? DISPLAYABLE_HAZARD_BUTTONS.find((h) => h.key === activeHazard)?.label ?? ""
                   : "表示しない"}
               </span>
-              <span aria-hidden>{hazardPanelOpen ? "▲ 閉じる" : "▼ 切り替える"}</span>
+              <ChevronDownIcon
+                className={`h-4 w-4 shrink-0 text-[var(--color-text-secondary)] transition-transform ${hazardPanelOpen ? "rotate-180" : ""}`}
+              />
             </button>
             {hazardPanelOpen && (
               <div
                 id="hazard-toggle-panel"
                 role="group"
                 aria-label="ハザード情報の表示切り替え"
-                className="grid grid-cols-3 gap-2 px-3 pb-2.5"
+                className="grid grid-cols-3 gap-2 px-3 pb-3"
               >
                 <button
                   type="button"
                   onClick={() => setActiveHazard(null)}
                   aria-pressed={activeHazard === null}
-                  className={`py-3 rounded-lg text-base font-bold border-2 ${
+                  className={`min-h-11 rounded-[var(--radius-md)] border-2 py-2.5 text-sm font-bold ${
                     activeHazard === null
-                      ? "bg-zinc-800 text-white border-zinc-800"
-                      : "bg-white text-zinc-700 border-zinc-300"
+                      ? "border-[var(--color-text-primary)] bg-[var(--color-text-primary)] text-white"
+                      : "border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                   }`}
                 >
                   表示しない
@@ -505,13 +509,13 @@ export default function MapView() {
                     type="button"
                     onClick={() => setActiveHazard(h.key)}
                     aria-pressed={activeHazard === h.key}
-                    className={`py-3 rounded-lg text-base font-bold border-2 ${
+                    className={`min-h-11 rounded-[var(--radius-md)] border-2 py-2.5 text-sm font-bold ${
                       activeHazard === h.key
-                        ? "bg-blue-700 text-white border-blue-700"
-                        : "bg-white text-zinc-700 border-zinc-300"
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
+                        : "border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-primary)]"
                     }`}
                   >
-                    {h.emoji} {h.label}
+                    {h.label}
                   </button>
                 ))}
               </div>
@@ -519,11 +523,10 @@ export default function MapView() {
           </div>
 
           {errorMessage && (
-            <div
-              role="alert"
-              className="pointer-events-auto rounded-lg border-2 border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 shadow"
-            >
-              {errorMessage}
+            <div className="pointer-events-auto">
+              <Notice tone="danger" title="現在地を確認できませんでした">
+                {errorMessage}
+              </Notice>
             </div>
           )}
         </div>
@@ -535,27 +538,28 @@ export default function MapView() {
         type="button"
         onClick={handleLocate}
         disabled={isLocating}
-        className="absolute bottom-6 right-4 z-[1000] flex items-center gap-2 rounded-full bg-blue-700 px-5 py-4 text-base font-bold text-white shadow-lg active:bg-blue-800 disabled:opacity-60"
+        className="absolute bottom-6 right-4 z-[1000] flex min-h-13 items-center gap-2 rounded-full bg-[var(--color-primary)] px-5 py-3.5 text-base font-bold text-white shadow-[var(--shadow-md)] transition-colors hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-hover)] disabled:opacity-60"
         style={{ marginBottom: "env(safe-area-inset-bottom)" }}
         aria-label={position ? "現在地を再取得する" : "現在地を取得する"}
       >
-        {isLocating ? "確認中…" : position ? "📍 再取得" : "📍 現在地"}
+        <LocationIcon className="h-5 w-5 shrink-0" />
+        {isLocating ? "確認中…" : position ? "再取得" : "現在地"}
       </button>
 
       {/* ハザード切替パネルを開いている間は下部オーバーレイが縦に伸びるため、
           凡例と重ならないよう一時的に隠す（判定・データ自体は無関係）。 */}
       {activeHazard && !hazardPanelOpen && (
-        <div className="absolute bottom-24 left-4 z-[1000] flex flex-col gap-1 rounded-lg bg-white/95 px-3 py-2 text-xs text-zinc-700 shadow">
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-3 w-3 rounded-full bg-green-600" />
+        <div className="absolute bottom-24 left-4 z-[1000] flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)]">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 shrink-0 rounded-full bg-[var(--color-success)]" />
             選択中の災害でも使える避難場所
           </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-3 w-3 rounded-full bg-zinc-500" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 shrink-0 rounded-full bg-zinc-500" />
             その他の指定緊急避難場所
           </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-3 w-3 rounded-full bg-blue-600" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 shrink-0 rounded-full bg-[var(--color-primary)]" />
             指定避難所
           </div>
         </div>

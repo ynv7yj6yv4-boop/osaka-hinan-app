@@ -5,6 +5,10 @@
 // 【重要】ここで有効化するのは通知の"登録"のみ。実際の自動通知判定ルール
 // (PART F-3)はまだ人間の確認前のため有効化していない(サーバー側の
 // 定期監視ジョブ自体、この時点ではまだ実装していない)。
+//
+// UI刷新: 一般ユーザーに技術用語(FCM/Firebase/monitoringPoint等)を見せず、
+// 「この地点の災害リスク通知」という利用者視点の言葉に統一する
+// (機能・API呼び出し自体は変更していない)。
 
 import { useEffect, useState } from "react";
 import { requestFcmToken } from "@/lib/firebaseClient";
@@ -17,6 +21,8 @@ import {
   setMonitoringPointEnabled,
   type MonitoringPointInfo,
 } from "@/lib/monitoringPoints";
+import Button from "./ui/Button";
+import { BellIcon } from "./ui/icons";
 
 type Step = "loading" | "not-registered" | "explaining" | "registered";
 
@@ -123,73 +129,59 @@ export default function MonitoringPointSection({ position }: { position: { lat: 
   };
 
   return (
-    <section className="mt-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
-      <h2 className="text-base font-bold text-zinc-900">🔔 この場所の災害情報を通知（試作機能）</h2>
+    <section className="mt-4 rounded-[var(--radius-md)] border-2 border-[var(--color-primary-border)] bg-[var(--color-primary-surface)] p-3.5">
+      <h3 className="flex items-center gap-2 text-base font-bold text-[var(--color-text-primary)]">
+        <BellIcon className="h-5 w-5 shrink-0 text-[var(--color-primary)]" />
+        この場所の災害リスク通知（試作機能）
+      </h3>
 
-      {step === "loading" && <p className="mt-1 text-sm text-zinc-600">確認しています…</p>}
+      {step === "loading" && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">確認しています…</p>}
 
       {step === "not-registered" && (
         <>
-          <p className="mt-1 text-sm text-zinc-700">
-            この地点を通知対象として登録すると、アプリを閉じていても災害情報をお知らせできるようになります。
+          <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+            この地点を通知対象として登録すると、アプリを閉じていても災害リスクの情報をお知らせできるようになります。
             <br />
             ※現時点では登録のみ実装済みで、実際に自動で通知を送る判定ルールはまだ有効化していません（人間の確認後に有効化予定）。
           </p>
-          <button
-            type="button"
-            onClick={() => setStep("explaining")}
-            className="mt-2 w-full rounded-lg bg-blue-700 py-2.5 text-sm font-bold text-white active:bg-blue-800"
-          >
-            この場所を通知対象として登録
-          </button>
+          <Button onClick={() => setStep("explaining")} fullWidth size="sm" className="mt-2.5">
+            この場所の通知を受け取る
+          </Button>
         </>
       )}
 
       {step === "explaining" && (
-        <div className="mt-2 rounded-lg bg-white p-2">
-          <p className="text-xs text-zinc-600">
+        <div className="mt-2.5 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+          <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
             通知を受け取るには、ブラウザの通知許可が必要です。次に表示される確認画面で「許可」を選んでください。
           </p>
-          <button
-            type="button"
-            onClick={handleRegister}
-            disabled={busy}
-            className="mt-2 w-full rounded-lg bg-blue-700 py-2 text-sm font-bold text-white disabled:opacity-60"
-          >
-            {busy ? "登録しています…" : "許可して登録する"}
-          </button>
+          <Button onClick={handleRegister} disabled={busy} fullWidth size="sm" className="mt-2.5">
+            {busy ? "登録しています…" : "許可して通知を受け取る"}
+          </Button>
         </div>
       )}
 
       {step === "registered" && info && (
-        <div className="mt-2">
-          <p className="text-sm text-zinc-700">
+        <div className="mt-2.5">
+          <p className="text-sm text-[var(--color-text-secondary)]">
             登録中：緯度{info.latitude.toFixed(4)}・経度{info.longitude.toFixed(4)}付近
           </p>
-          <p className="mt-1 text-xs text-zinc-500">対象ハザード：洪水・内水氾濫（高潮は対象外）</p>
-          <p className="mt-1 text-xs text-zinc-500">通知：{info.notificationEnabled ? "有効" : "停止中"}</p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => handleToggle(!info.notificationEnabled)}
-              disabled={busy}
-              className="flex-1 rounded-lg border-2 border-zinc-300 py-2 text-sm font-bold text-zinc-700 disabled:opacity-60"
-            >
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">対象ハザード：洪水・内水氾濫（高潮は対象外）</p>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            通知：{info.notificationEnabled ? "受け取る" : "停止中"}
+          </p>
+          <div className="mt-2.5 flex gap-2">
+            <Button onClick={() => handleToggle(!info.notificationEnabled)} disabled={busy} variant="secondary" size="sm" className="flex-1">
               {info.notificationEnabled ? "通知を停止" : "通知を再開"}
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={busy}
-              className="flex-1 rounded-lg border-2 border-red-300 py-2 text-sm font-bold text-red-700 disabled:opacity-60"
-            >
+            </Button>
+            <Button onClick={handleDelete} disabled={busy} variant="danger-outline" size="sm" className="flex-1">
               通知地点を削除
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      {errorMessage && <p className="mt-2 text-xs font-bold text-red-700">{errorMessage}</p>}
+      {errorMessage && <p className="mt-2 text-xs font-bold text-[var(--color-danger)]">{errorMessage}</p>}
     </section>
   );
 }

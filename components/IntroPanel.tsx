@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { isIosSafariNotStandalone } from "@/lib/platform";
+import Button from "./ui/Button";
+import { LocationIcon } from "./ui/icons";
 
 export default function IntroPanel({
   isLocating,
@@ -18,25 +20,21 @@ export default function IntroPanel({
   const [showIosHint] = useState(isIosSafariNotStandalone);
 
   return (
-    <div className="mx-3 mt-3 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
-      <h2 className="text-lg font-bold text-zinc-900">大阪市 災害避難支援</h2>
-      <p className="mt-1 text-sm text-zinc-700">
+    <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-sm)]">
+      <h2 className="text-lg font-bold text-[var(--color-text-primary)]">大阪市 災害避難支援</h2>
+      <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
         現在地のハザード情報から、避難の判断を支援します。
       </p>
-      <button
-        type="button"
-        onClick={onLocate}
-        disabled={isLocating}
-        className="mt-3 w-full rounded-lg bg-blue-700 py-4 text-lg font-bold text-white active:bg-blue-800 disabled:opacity-60"
-      >
-        {isLocating ? "現在地を確認しています…" : "📍 現在地を取得して確認する"}
-      </button>
-      <p className="mt-2 text-xs text-zinc-600">
+      <Button onClick={onLocate} disabled={isLocating} fullWidth size="lg" className="mt-3">
+        <LocationIcon className="h-5 w-5 shrink-0" />
+        {isLocating ? "現在地を確認しています…" : "現在地を取得して確認する"}
+      </Button>
+      <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-muted)]">
         ※本アプリは参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。
       </p>
       {showIosHint && (
-        <p className="mt-2 rounded-lg bg-white/70 px-2 py-1.5 text-xs text-zinc-600">
-          📱 iPhoneをお使いの場合、共有ボタン→「ホーム画面に追加」しておくと、今後追加予定の通知機能等がご利用いただけます。
+        <p className="mt-2 rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] px-2.5 py-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          iPhoneをお使いの場合、共有ボタンから「ホーム画面に追加」しておくと、今後追加予定の通知機能等がご利用いただけます。
         </p>
       )}
     </div>

@@ -1,7 +1,10 @@
 "use client";
 
-import { RISK_LEVEL_INFO, type RiskResult } from "@/lib/riskAssessment";
+import type { RiskResult } from "@/lib/riskAssessment";
+import { RISK_PRESENTATION } from "./riskLevelPresentation";
 import MonitoringPointSection from "./MonitoringPointSection";
+import Modal from "./ui/Modal";
+import Notice from "./ui/Notice";
 
 // 内部の英語表現(complete/partial/unavailable)を、一般ユーザー向けの日本語に変換する。
 // 試作2: 高潮を研究対象から除外したため、対象ハザードは洪水・内水氾濫の2つ
@@ -28,94 +31,86 @@ export default function RiskDetailModal({
   result: RiskResult;
   onClose: () => void;
 }) {
-  const info = RISK_LEVEL_INFO[result.level];
+  const p = RISK_PRESENTATION[result.level];
+  const Icon = p.icon;
 
   return (
-    <div
-      className="fixed inset-0 z-[2000] flex items-end sm:items-center sm:justify-center bg-black/40"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 sm:max-w-md sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl leading-none" aria-hidden>
-              {info.emoji}
+    <Modal
+      onClose={onClose}
+      labelledBy="risk-detail-heading"
+      leading={
+        <span className="flex items-center gap-2.5">
+          <Icon className="h-7 w-7 shrink-0" style={{ color: p.fg }} />
+          <span>
+            <span className="block text-xs font-medium text-[var(--color-text-secondary)]">現在地の災害リスク</span>
+            <span id="risk-detail-heading" className="block text-xl font-bold" style={{ color: p.fg }}>
+              {p.label}
             </span>
-            <div>
-              <div className="text-xs text-zinc-600">現在地の災害リスク</div>
-              <div className="text-2xl font-bold" style={{ color: info.color }}>
-                {info.label}
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="閉じる"
-            className="rounded-full border-2 border-zinc-300 px-3 py-1 text-lg font-bold text-zinc-600"
-          >
-            ×
-          </button>
-        </div>
+          </span>
+        </span>
+      }
+    >
+      <Notice tone="info" title="このリスク評価は自治体等の公式な避難指示ではありません">
+        大阪市を対象とした静的なハザードマップに基づく参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。
+      </Notice>
 
-        <section className="mt-4 rounded-lg border-2 border-sky-200 bg-sky-50 p-3">
-          <h2 className="text-base font-bold text-zinc-900">現在の降雨（参考情報）</h2>
-          {result.rainfall.status === "observed" ? (
-            <>
-              <p className="mt-1 text-base text-zinc-800">{result.rainfall.approxRange}</p>
-              <p className="mt-1 text-xs text-zinc-500">
-                気象庁レーダーによる {result.rainfall.dataTimeLabel} 時点のデータ（目安）
-              </p>
-            </>
-          ) : (
-            <p className="mt-1 text-sm text-zinc-600">
-              現在の降雨データを取得できないため、降雨状況は判定に反映していません。
+      <section className="mt-4">
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">次に確認するとよいこと</h3>
+        <p className="mt-1 text-base leading-relaxed text-[var(--color-text-primary)]">{p.action}</p>
+      </section>
+
+      <section className="mt-4 rounded-[var(--radius-md)] border-2 border-[var(--color-info-border)] bg-[var(--color-info-surface)] p-3.5">
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">現在の降雨（参考情報）</h3>
+        {result.rainfall.status === "observed" ? (
+          <>
+            <p className="mt-1 text-base text-[var(--color-text-primary)]">{result.rainfall.approxRange}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              気象庁レーダーによる {result.rainfall.dataTimeLabel} 時点のデータ（目安）
             </p>
-          )}
-          <p className="mt-2 text-xs font-bold text-sky-800">
-            ※この降雨情報は、下記の「現在地の災害リスク」の判定にはまだ反映されていません（今後のPhaseで対応予定）。
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            現在の降雨データを取得できないため、降雨状況は判定に反映していません。
           </p>
-        </section>
+        )}
+        <p className="mt-2 text-xs font-bold text-[var(--color-info)]">
+          ※この降雨情報は、下記の「現在地の災害リスク」の判定にはまだ反映されていません（今後のPhaseで対応予定）。
+        </p>
+      </section>
 
-        <section className="mt-4">
-          <h2 className="text-base font-bold text-zinc-900">判定理由（静的なハザード情報）</h2>
-          <ul className="mt-2 space-y-1 text-base text-zinc-800">
-            {result.reasons.map((reason, i) => (
-              <li key={i}>・{reason}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="mt-4">
-          <h2 className="text-base font-bold text-zinc-900">判定状況</h2>
-          <p className="mt-1 text-base text-zinc-800">
-            {COMPLETENESS_TEXT[result.assessmentCompleteness].label}
-          </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            {COMPLETENESS_TEXT[result.assessmentCompleteness].detail}
-          </p>
-        </section>
-
-        <section className="mt-4 rounded-lg bg-zinc-50 p-3">
-          <h2 className="text-base font-bold text-zinc-900">推奨行動</h2>
-          <p className="mt-1 text-base text-zinc-800">{result.recommendation}</p>
-        </section>
-
-        <MonitoringPointSection position={result.position} />
-
-        <section className="mt-4 border-t border-zinc-200 pt-3">
-          {result.disclaimers.map((d, i) => (
-            <p key={i} className="mt-1 text-xs leading-relaxed text-zinc-500">
-              ※{d}
-            </p>
+      <section className="mt-4">
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">判定理由（静的なハザード情報）</h3>
+        <ul className="mt-2 space-y-1 text-base text-[var(--color-text-primary)]">
+          {result.reasons.map((reason, i) => (
+            <li key={i}>・{reason}</li>
           ))}
-        </section>
-      </div>
-    </div>
+        </ul>
+      </section>
+
+      <section className="mt-4">
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">判定状況</h3>
+        <p className="mt-1 text-base text-[var(--color-text-primary)]">
+          {COMPLETENESS_TEXT[result.assessmentCompleteness].label}
+        </p>
+        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+          {COMPLETENESS_TEXT[result.assessmentCompleteness].detail}
+        </p>
+      </section>
+
+      <section className="mt-4 rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3.5">
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">推奨行動</h3>
+        <p className="mt-1 text-base text-[var(--color-text-primary)]">{result.recommendation}</p>
+      </section>
+
+      <MonitoringPointSection position={result.position} />
+
+      <section className="mt-4 border-t border-[var(--color-border)] pt-3">
+        {result.disclaimers.map((d, i) => (
+          <p key={i} className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
+            ※{d}
+          </p>
+        ))}
+      </section>
+    </Modal>
   );
 }

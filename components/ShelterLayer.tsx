@@ -29,11 +29,13 @@ type SheltersData = {
 
 // 種類・対応状況ごとにアイコン（色だけに頼らず絵文字でも区別する）
 function makeIcon(kind: "shelter" | "safe" | "other") {
+  // UI刷新: 色だけに頼らず絵文字も併用する既存方針は維持しつつ、
+  // グローバルなデザイントークン(CSS変数)と同じ色を使い一貫性を持たせる。
   const style =
     kind === "safe"
-      ? { bg: "#16a34a", emoji: "✅" } // 選択中の災害に対応：緑
+      ? { bg: "var(--color-success)", emoji: "✅" } // 選択中の災害に対応：緑
       : kind === "shelter"
-      ? { bg: "#2563eb", emoji: "🏠" } // 指定避難所：青
+      ? { bg: "var(--color-primary)", emoji: "🏠" } // 指定避難所：青
       : { bg: "#6b7280", emoji: "📍" }; // その他の指定緊急避難場所：グレー
 
   return L.divIcon({

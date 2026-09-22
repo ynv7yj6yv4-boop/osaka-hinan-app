@@ -1,26 +1,119 @@
 @import "tailwindcss";
 
+/* ============================================================
+   デザイントークン
+   デジタル庁デザインシステム(DADS)の考え方(セマンティックカラー、
+   WCAG AA相当のコントラスト、8pxベースのspacing、Noto Sans JP、
+   Primary/Secondary/Tertiaryのボタン階層)を参考に、このアプリ用に
+   最小構成で整理したトークン。DADSの配色・ロゴ自体はコピーしない。
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* --- ベース --- */
+  --color-background: #f7f8fa; /* 白に近い非常に薄いグレー */
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f1f3f5;
+  --color-border: #d9dde3;
+  --color-border-strong: #b6bcc6;
+
+  /* --- テキスト（背景#ffffffに対しWCAG AA 4.5:1以上を意識） --- */
+  --color-text-primary: #1a1d21;
+  --color-text-secondary: #4a5058;
+  --color-text-muted: #6b7280;
+  --color-text-on-primary: #ffffff;
+
+  /* --- ブランド/操作色 --- */
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1740ad;
+  --color-primary-surface: #eaf1ff;
+  --color-primary-border: #b9d0fb;
+
+  /* --- セマンティックカラー(状態表現。色だけに依存せずアイコン・文言を必ず併用) --- */
+  --color-success: #15803d;
+  --color-success-surface: #eefbf1;
+  --color-success-border: #a7e3b6;
+
+  --color-info: #0f5fa8;
+  --color-info-surface: #eaf4fc;
+  --color-info-border: #b6dcf3;
+
+  --color-warning: #92640a;
+  --color-warning-surface: #fff8e6;
+  --color-warning-border: #f2d98a;
+
+  --color-danger: #b3261e;
+  --color-danger-surface: #fdecea;
+  --color-danger-border: #f3b5af;
+
+  /* --- 災害リスクレベル専用トークン(lib/riskAssessment.tsのRiskLevelに対応。
+       判定ロジック・値の意味は変更しない。表示色のみをここで一元管理する) --- */
+  --color-risk-unknown: #52525b;
+  --color-risk-unknown-surface: #f1f2f4;
+  --color-risk-unknown-border: #d4d4d8;
+
+  --color-risk-safe: #15803d;
+  --color-risk-safe-surface: #eefbf1;
+  --color-risk-safe-border: #a7e3b6;
+
+  --color-risk-caution: #8a5a00;
+  --color-risk-caution-surface: #fff6e0;
+  --color-risk-caution-border: #eecb73;
+
+  --color-risk-prepare: #b1470a;
+  --color-risk-prepare-surface: #fff1e8;
+  --color-risk-prepare-border: #f3bd93;
+
+  --color-risk-evacuate: #b3261e;
+  --color-risk-evacuate-surface: #fdecea;
+  --color-risk-evacuate-border: #f3b5af;
+
+  /* --- 角丸・シャドウ・フォーカス(過度な演出を避け必要最小限に) --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.12);
+  --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.45);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-text-primary);
+  --font-sans: var(--font-noto-sans-jp), "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  /* デジタル庁デザインシステム: 本文は最低でも1.5倍程度の行高を確保する */
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+/* 見出しは行高をやや詰めつつ、本文との対比で階層が伝わるようにする */
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.4;
+}
+
+/* キーボード操作時のフォーカスを常に明確にする(マウスクリックでは表示しない) */
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* 派手なアニメーションを避け、必要な軽微な遷移のみ許可した上で、
+   prefers-reduced-motionの場合はそれも止める。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

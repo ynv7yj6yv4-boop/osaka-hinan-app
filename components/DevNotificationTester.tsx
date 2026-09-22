@@ -57,8 +57,8 @@ export default function DevNotificationTester() {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 z-[3000] w-72 max-w-[85vw] rounded-lg border-2 border-purple-400 bg-white p-3 text-xs shadow-lg">
-      <p className="font-bold text-purple-700">🛠 開発者用：通知テスト</p>
+    <div className="fixed bottom-4 left-4 z-[3000] w-72 max-w-[85vw] rounded-[var(--radius-md)] border-2 border-purple-400 bg-white p-3 text-xs shadow-[var(--shadow-md)]">
+      <p className="font-bold text-purple-700">開発者用：通知テスト</p>
 
       {state === "idle" && !showExplanation && (
         <button
