@@ -22,6 +22,10 @@ import { notificationDecisionConfig } from "./notificationDecisionConfig";
 import { classifyHazardPixelNode, type HazardPixelStatus } from "./hazardPixelClassifierNode";
 import { fetchRainfallForecastNode } from "./rainfallForecastNode";
 import { fetchTotalPredictedRainfall } from "./floodRiskForecastNode";
+import { sendFcmNotification } from "./fcmSender";
+import { processCandidateSend } from "./notificationSendPipeline";
+import { notificationMessageDraft } from "./notificationMessage";
+import { resolveGitCommitHash, shouldWriteNotificationLog, type NotificationLogDoc } from "./notificationLog";
 
 // components/hazardLayers.ts の HAZARD_TILE_URL.flood と同じ値（意図的に複製。
 // notificationDecisionConfig.targetHazard="flood"のみが対象のため、floodだけ持つ）。
@@ -39,15 +43,31 @@ export type MonitoringCheckResult = {
   insufficientDataCount: number;
 };
 
-export async function runMonitoringCheck(db: Firestore): Promise<MonitoringCheckResult> {
+// 要件定義書4 §2: 送信可否判定と送信処理をmonitoringCheck.tsのループから
+// 注入可能にする(依存性注入・テスト容易性の確保)。本番の呼び出し元
+// (index.ts / runStandalone.ts)はdepsを渡さず、デフォルト(実際のFCM送信・
+// 現在時刻・GITHUB_SHA)がそのまま使われる。
+export type MonitoringCheckDeps = {
+  now?: Date;
+  gitCommitHash?: string | null;
+  sendFcmNotification?: typeof sendFcmNotification;
+};
+
+export async function runMonitoringCheck(db: Firestore, deps: MonitoringCheckDeps = {}): Promise<MonitoringCheckResult> {
   const snapshot = await db.collection("monitoringPoints").where("notificationEnabled", "==", true).get();
 
-  const now = new Date();
+  const now = deps.now ?? new Date();
+  const gitCommitHash = deps.gitCommitHash ?? resolveGitCommitHash();
+  const sendFn = deps.sendFcmNotification ?? sendFcmNotification;
   let candidateCount = 0;
   let insufficientDataCount = 0;
 
   // Firestoreの一括更新はバッチ1件あたり最大500件までのため、
   // 件数が少ない研究プロトタイプの現段階ではbatchで十分。
+  // 【要件定義書4 §10】monitoringPointsの更新とnotificationLogsの追加を
+  // 同じbatchに含めることで、両者が同じcommitで成功/失敗するようにし
+  // (「送信成功なのにcooldown更新だけ失敗」「ログだけ書き込まれない」
+  // 等の不整合を、新規のトランザクション機構を導入せずに避ける)。
   const batch = db.batch();
 
   for (const doc of snapshot.docs) {
@@ -56,6 +76,8 @@ export async function runMonitoringCheck(db: Firestore): Promise<MonitoringCheck
       longitude?: number;
       lastNotificationState?: "sent" | "not_sent" | null;
       lastNotifiedAt?: string | null;
+      lastDecisionType?: string | null;
+      fcmToken?: string;
     };
 
     if (typeof data.latitude !== "number" || typeof data.longitude !== "number") {
@@ -121,8 +143,48 @@ export async function runMonitoringCheck(db: Firestore): Promise<MonitoringCheck
     if (floodRiskDecision.type === "candidate") candidateCount++; // enabled:falseの間は理論上到達しない
     if (floodRiskDecision.type === "insufficient_data") insufficientDataCount++;
 
-    // 実際の通知送信(FCM)は行わない。確認した事実とバージョンのみ記録する。
-    // 取得した実データも、後日の検証・研究のため記録として残す(黙って捨てない)。
+    // 要件定義書4 §2・§5.5・§8: 送信可否判定(floodRiskDecision)と送信処理を
+    // 分離実装する。ここでもnotificationDecisionConfig.enabledを確認してから
+    // でなければ送信関数(sendFn)を呼ばない(判定ロジック側の多重防御と
+    // 二重に保護する。enabled=falseの間はsendFnが一度も呼ばれない)。
+    const sendOutcome = await processCandidateSend(
+      floodRiskDecision,
+      notificationDecisionConfig.enabled,
+      data.fcmToken ?? "",
+      now,
+      sendFn,
+      notificationMessageDraft
+    );
+
+    // 要件定義書4 §5.7: 既存のlastDecisionType(前回評価の結果)をそのまま
+    // 状態遷移検知に使う(新規の状態管理を増やさない)。
+    const previousDecisionType = data.lastDecisionType ?? null;
+    if (shouldWriteNotificationLog(previousDecisionType, floodRiskDecision.type, sendOutcome.sendAttempted)) {
+      const logDoc: NotificationLogDoc = {
+        monitoringPointId: doc.id,
+        evaluatedAt: now.toISOString(),
+        decisionVersion: notificationDecisionConfig.decisionVersion,
+        gitCommitHash,
+        staticFloodHazardStatus: hazardPixel.status,
+        staticFloodHazardDepthRank: staticFloodHazard.depthRank,
+        totalPredictedRainfallMm: totalPredictedRainfallInput.totalPredictedRainfallMm,
+        windowHours: totalPredictedRainfallInput.windowHours,
+        dataCompleteness: floodRiskDataCompleteness,
+        decisionType: floodRiskDecision.type,
+        decisionReason: floodRiskDecision.reason,
+        sendAttempted: sendOutcome.sendAttempted,
+        sendResult: sendOutcome.sendResult,
+        sendErrorCode: sendOutcome.sendErrorCode,
+        autoDisabledPoint: sendOutcome.autoDisabledPoint,
+      };
+      // notificationLogsは横断集計・研究分析のしやすさを優先し、トップレベル
+      // コレクションとする(monitoringPoints/{id}/logsのサブコレクションにしない)。
+      batch.set(db.collection("notificationLogs").doc(), logDoc);
+    }
+
+    // 取得した実データは、後日の検証・研究のため記録として残す(黙って捨てない)。
+    // 【要件定義書4 §10】monitoringPointsの更新とnotificationLogsの追加
+    // (上記batch.set)は同じbatchに含まれるため、同一commitで成功/失敗する。
     batch.update(doc.ref, {
       lastCheckedAt: FieldValue.serverTimestamp(),
       decisionVersion: notificationDecisionConfig.decisionVersion,
@@ -132,6 +194,12 @@ export async function runMonitoringCheck(db: Firestore): Promise<MonitoringCheck
       lastTotalPredictedRainfallStatus: totalPredictedRainfallInput.status,
       lastTotalPredictedRainfallMm: totalPredictedRainfallInput.totalPredictedRainfallMm,
       lastTotalPredictedRainfallWindowHours: totalPredictedRainfallInput.windowHours,
+      // 要件定義書4 §5.6: 送信が実際に成功した場合にのみ更新する(cooldown用)。
+      // 送信を試みなかった場合・試みて失敗した場合はここでスプレッドされず、
+      // 既存のフィールド値は変更されない。
+      ...(sendOutcome.cooldownUpdate ?? {}),
+      // 要件定義書4 §5.8: 恒久的に無効なトークンを検出した場合のみfalseにする。
+      ...(sendOutcome.notificationEnabledUpdate === false ? { notificationEnabled: false } : {}),
       // 比較用(研究目的)。本番採用の判定はlastDecisionType(予測総雨量ベース)。
       lastLegacyRankDecisionType: legacyDecision.type,
       lastRainfallForecastStatus: rainfallForecastInput.status,
