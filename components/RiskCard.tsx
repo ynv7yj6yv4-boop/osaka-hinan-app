@@ -4,7 +4,16 @@
 // 伝わるよう、状態名→一文説明→対象ハザード→行動→詳細リンク、の階層で構成する。
 // 【重要】判定ロジック・値(RiskResult.level等)は一切変更していない。
 // 表示だけをriskLevelPresentation.ts(UI専用)に基づいて組み立てる。
+//
+// 折りたたみUI(iPhone実機での改善要望): 高リスク時にカードが縦に伸びて
+// 地図の可視領域を圧迫していたため、要約部分(状態名・一文説明)と
+// 折りたたみ詳細部分(対象ハザード・前回比較・未確認ハザードの注記・
+// 「くわしい理由を見る」)の2段構成にした。どのRiskLevelでも同じ構造を
+// 使うため、"高リスクだけ"のような判定レベル固有の分岐は持たない。
+// 開閉状態はReact stateのみで保持し(要望によりlocalStorageへは保存しない)、
+// 初期状態はモバイル・PC問わず常に折りたたみとする(実装をシンプルに保つ)。
 
+import { useId, useState } from "react";
 import type { RiskResult } from "@/lib/riskAssessment";
 import type { RecordRiskHistoryResult } from "@/lib/riskHistory";
 import { formatPreviousCheckedAt } from "@/lib/riskHistory";
@@ -31,6 +40,9 @@ export default function RiskCard({
   /** 前回確認時との比較(この端末内のみで保持。lib/riskHistory.ts参照)。無ければ表示しない。 */
   comparison?: RecordRiskHistoryResult | null;
 }) {
+  const cardId = useId();
+  const [expanded, setExpanded] = useState(false);
+
   if (isLoading) {
     return (
       <div className="mt-2 flex items-center gap-2 rounded-[var(--radius-lg)] border-2 border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3.5 text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)]">
@@ -47,46 +59,68 @@ export default function RiskCard({
 
   const p = RISK_PRESENTATION[result.level];
   const Icon = p.icon;
+  const detailSectionId = `${cardId}-detail`;
 
   return (
-    <button
-      type="button"
-      onClick={onOpenDetail}
-      className="mt-2 flex w-full items-start gap-3 rounded-[var(--radius-lg)] border-2 px-4 py-3.5 text-left shadow-[var(--shadow-sm)] transition-colors active:opacity-90"
+    <div
+      className="mt-2 rounded-[var(--radius-lg)] border-2 shadow-[var(--shadow-sm)]"
       style={{ borderColor: p.border, backgroundColor: p.surface }}
     >
-      <Icon className="mt-0.5 h-7 w-7 shrink-0" style={{ color: p.fg }} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs font-medium text-[var(--color-text-secondary)]">現在地の災害リスク（参考評価）</span>
-        <span className="mt-0.5 block text-xl font-bold" style={{ color: p.fg }}>
-          {p.label}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls={detailSectionId}
+        className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors active:opacity-90"
+      >
+        <Icon className="mt-0.5 h-7 w-7 shrink-0" style={{ color: p.fg }} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium text-[var(--color-text-secondary)]">現在地の災害リスク（参考評価）</span>
+          <span className="mt-0.5 block text-xl font-bold" style={{ color: p.fg }}>
+            {p.label}
+          </span>
+          <span className="mt-1 block text-sm leading-snug text-[var(--color-text-primary)]">{p.summary}</span>
         </span>
-        <span className="mt-1 block text-sm leading-snug text-[var(--color-text-primary)]">{p.summary}</span>
-        <span className="mt-1 block text-xs leading-snug text-[var(--color-text-secondary)]">{targetHazardText(result)}</span>
-        {comparison && (
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug">
-            <span className="flex items-center gap-1 font-bold" style={{ color: RISK_COMPARISON_TONE_COLOR[describeRiskComparison(comparison.comparison).tone] }}>
-              <span aria-hidden>{describeRiskComparison(comparison.comparison).symbol}</span>
-              {describeRiskComparison(comparison.comparison).text}
-            </span>
-            {comparison.previous && (
-              <span className="text-[var(--color-text-muted)]">
-                （前回確認：{formatPreviousCheckedAt(comparison.previous.evaluatedAt)}）
+        <span className="mt-0.5 flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">
+          {expanded ? "閉じる" : "詳細を見る"}
+          <ChevronDownIcon
+            className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+
+      {expanded && (
+        <div id={detailSectionId} className="px-4 pb-3.5">
+          <span className="block text-xs leading-snug text-[var(--color-text-secondary)]">{targetHazardText(result)}</span>
+          {comparison && (
+            <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug">
+              <span className="flex items-center gap-1 font-bold" style={{ color: RISK_COMPARISON_TONE_COLOR[describeRiskComparison(comparison.comparison).tone] }}>
+                <span aria-hidden>{describeRiskComparison(comparison.comparison).symbol}</span>
+                {describeRiskComparison(comparison.comparison).text}
               </span>
-            )}
-          </span>
-        )}
-        {result.assessmentCompleteness === "partial" && (
-          <span className="mt-1.5 flex items-center gap-1 text-xs font-bold text-[var(--color-warning)]">
-            <WarningIcon className="h-3.5 w-3.5 shrink-0" />
-            一部のハザード情報を確認できていません
-          </span>
-        )}
-        <span className="mt-2 flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">
-          くわしい理由・取るべき行動を見る
-          <ChevronDownIcon className="h-4 w-4 -rotate-90" />
-        </span>
-      </span>
-    </button>
+              {comparison.previous && (
+                <span className="text-[var(--color-text-muted)]">
+                  （前回確認：{formatPreviousCheckedAt(comparison.previous.evaluatedAt)}）
+                </span>
+              )}
+            </span>
+          )}
+          {result.assessmentCompleteness === "partial" && (
+            <span className="mt-1.5 flex items-center gap-1 text-xs font-bold text-[var(--color-warning)]">
+              <WarningIcon className="h-3.5 w-3.5 shrink-0" />
+              一部のハザード情報を確認できていません
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            className="mt-2 flex min-h-11 items-center gap-1 text-sm font-bold text-[var(--color-primary)]"
+          >
+            くわしい理由・取るべき行動を見る
+            <ChevronDownIcon className="h-4 w-4 -rotate-90" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
