@@ -74,7 +74,7 @@ export default function RiskDetailModal({
           </p>
         )}
         <p className="mt-2 text-xs font-bold text-[var(--color-info)]">
-          ※この降雨情報は、下記の「現在地の災害リスク」の判定にはまだ反映されていません（今後のPhaseで対応予定）。
+          ※この降雨情報は、下記の「現在地の災害リスク」の判定にはまだ反映されていません。
         </p>
       </section>
 
