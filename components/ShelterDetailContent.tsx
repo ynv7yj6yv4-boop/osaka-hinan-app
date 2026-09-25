@@ -19,11 +19,6 @@ import Notice from "./ui/Notice";
 
 const OFFICIAL_LINKS = [
   {
-    label: "大阪市 災害時ホームページ（避難場所・避難所）",
-    provider: "大阪市",
-    url: "https://www.city.osaka.lg.jp/kikikanrishitsu/page/0000255675.html",
-  },
-  {
     label: "おおさか防災ネット 避難所検索",
     provider: "大阪府",
     url: "https://www.osaka-bousai.net/shelter/index.html",
