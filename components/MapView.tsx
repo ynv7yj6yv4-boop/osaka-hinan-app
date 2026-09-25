@@ -16,6 +16,7 @@ import Button from "./ui/Button";
 import Notice from "./ui/Notice";
 import { LocationIcon, ChevronDownIcon } from "./ui/icons";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
+import { recordRiskHistoryEntry, type RecordRiskHistoryResult } from "@/lib/riskHistory";
 import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
@@ -100,6 +101,9 @@ export default function MapView() {
   const [hazardPanelOpen, setHazardPanelOpen] = useState(false);
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [isAssessingRisk, setIsAssessingRisk] = useState(false);
+  // 研究用・UX改善用: 前回確認したリスクとの比較(この端末のlocalStorageのみ。
+  // Firestore・通知判定には一切影響しない。lib/riskHistory.ts参照)。
+  const [riskComparison, setRiskComparison] = useState<RecordRiskHistoryResult | null>(null);
   const [showRiskDetail, setShowRiskDetail] = useState(false);
   const [showEvacuationPanel, setShowEvacuationPanel] = useState(false);
   const [evacuationRoutes, setEvacuationRoutes] = useState<{
@@ -233,7 +237,13 @@ export default function MapView() {
         // 現在地が取得できたら、続けてその場所の危険度を自動判定する
         setIsAssessingRisk(true);
         assessRisk(lat, lng)
-          .then(setRiskResult)
+          .then((result) => {
+            setRiskResult(result);
+            // 研究用・UX改善用: 前回確認時との比較をこの端末内(localStorage)だけで
+            // 記録する。サーバーへは送信せず、失敗してもリスク表示自体は壊れない
+            // (lib/riskHistory.ts参照)。
+            setRiskComparison(recordRiskHistoryEntry(result.level, result.generatedAt));
+          })
           .finally(() => setIsAssessingRisk(false));
       },
       (error) => {
@@ -430,6 +440,7 @@ export default function MapView() {
               result={riskResult}
               isLoading={isAssessingRisk}
               onOpenDetail={() => setShowRiskDetail(true)}
+              comparison={riskComparison}
             />
           </div>
         </div>

@@ -6,7 +6,9 @@
 // 表示だけをriskLevelPresentation.ts(UI専用)に基づいて組み立てる。
 
 import type { RiskResult } from "@/lib/riskAssessment";
-import { RISK_PRESENTATION } from "./riskLevelPresentation";
+import type { RecordRiskHistoryResult } from "@/lib/riskHistory";
+import { formatPreviousCheckedAt } from "@/lib/riskHistory";
+import { RISK_PRESENTATION, describeRiskComparison, RISK_COMPARISON_TONE_COLOR } from "./riskLevelPresentation";
 import { WarningIcon, ChevronDownIcon } from "./ui/icons";
 
 const HAZARD_LABEL: Record<string, string> = { flood: "洪水", inundation: "内水氾濫" };
@@ -21,10 +23,13 @@ export default function RiskCard({
   result,
   isLoading,
   onOpenDetail,
+  comparison,
 }: {
   result: RiskResult | null;
   isLoading: boolean;
   onOpenDetail: () => void;
+  /** 前回確認時との比較(この端末内のみで保持。lib/riskHistory.ts参照)。無ければ表示しない。 */
+  comparison?: RecordRiskHistoryResult | null;
 }) {
   if (isLoading) {
     return (
@@ -58,6 +63,19 @@ export default function RiskCard({
         </span>
         <span className="mt-1 block text-sm leading-snug text-[var(--color-text-primary)]">{p.summary}</span>
         <span className="mt-1 block text-xs leading-snug text-[var(--color-text-secondary)]">{targetHazardText(result)}</span>
+        {comparison && (
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug">
+            <span className="flex items-center gap-1 font-bold" style={{ color: RISK_COMPARISON_TONE_COLOR[describeRiskComparison(comparison.comparison).tone] }}>
+              <span aria-hidden>{describeRiskComparison(comparison.comparison).symbol}</span>
+              {describeRiskComparison(comparison.comparison).text}
+            </span>
+            {comparison.previous && (
+              <span className="text-[var(--color-text-muted)]">
+                （前回確認：{formatPreviousCheckedAt(comparison.previous.evaluatedAt)}）
+              </span>
+            )}
+          </span>
+        )}
         {result.assessmentCompleteness === "partial" && (
           <span className="mt-1.5 flex items-center gap-1 text-xs font-bold text-[var(--color-warning)]">
             <WarningIcon className="h-3.5 w-3.5 shrink-0" />

@@ -11,6 +11,7 @@
 
 import type { ComponentType, CSSProperties } from "react";
 import type { RiskLevel } from "@/lib/riskAssessment";
+import type { RiskComparison } from "@/lib/riskHistory";
 import { SuccessIcon, WarningIcon, DangerIcon, UnknownIcon } from "./ui/icons";
 
 export type RiskPresentation = {
@@ -72,4 +73,40 @@ export const RISK_PRESENTATION: Record<RiskLevel, RiskPresentation> = {
     surface: "var(--color-risk-evacuate-surface)",
     border: "var(--color-risk-evacuate-border)",
   },
+};
+
+// 「前回確認時と比べてどう変化したか」の表示文言。
+// 【重要】色だけに頼らないよう、symbol(記号)とtextを必ずセットで表示する。
+// 「危険になりました」「安全になりました」等の断定・不安を煽る表現は避け、
+// 既存のRISK_PRESENTATIONと同じトーン(あくまで参考情報)に揃えている。
+export type RiskComparisonPresentation = {
+  symbol: string;
+  text: string;
+  tone: "increase" | "decrease" | "neutral" | "unknown";
+};
+
+export function describeRiskComparison(comparison: RiskComparison): RiskComparisonPresentation {
+  switch (comparison.kind) {
+    case "no_previous":
+      return { symbol: "―", text: "初回のため比較データはありません", tone: "neutral" };
+    case "both_unknown":
+      return { symbol: "―", text: "比較できません（前回・今回とも情報を取得できませんでした）", tone: "unknown" };
+    case "unknown_now":
+      return { symbol: "―", text: "今回は情報を取得できなかったため、前回との比較ができません", tone: "unknown" };
+    case "unknown_previous":
+      return { symbol: "―", text: "前回は情報を取得できていませんでしたが、今回は比較可能な情報を取得できました", tone: "neutral" };
+    case "increased":
+      return { symbol: "↑", text: "前回の確認時よりリスクが高くなっています", tone: "increase" };
+    case "decreased":
+      return { symbol: "↓", text: "前回の確認時よりリスクが低くなっています", tone: "decrease" };
+    case "same":
+      return { symbol: "→", text: "前回の確認時から大きな変化はありません", tone: "neutral" };
+  }
+}
+
+export const RISK_COMPARISON_TONE_COLOR: Record<RiskComparisonPresentation["tone"], string> = {
+  increase: "var(--color-risk-prepare)",
+  decrease: "var(--color-risk-safe)",
+  neutral: "var(--color-text-secondary)",
+  unknown: "var(--color-text-muted)",
 };
