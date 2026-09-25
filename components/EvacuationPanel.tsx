@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   findFloodShelterCandidates,
   type FloodShelterCandidate,
@@ -13,11 +13,15 @@ import {
   type LatLng,
 } from "@/lib/routeHazardEvaluation";
 import { buildRouteJudgmentLog, type RouteJudgmentLog } from "@/lib/routeJudgmentLog";
+import { evaluateRouteSegmentRisk, type RouteRiskSegment } from "@/lib/routeSegmentRisk";
 import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Notice from "./ui/Notice";
 import ShelterDetailContent from "./ShelterDetailContent";
+import RouteRiskLegend from "./RouteRiskLegend";
+import RouteRiskDetail from "./RouteRiskDetail";
 import { toHazardLabels } from "./hazardLayers";
+import { ROUTE_RISK_LEVEL_PRESENTATION } from "./routeRiskPresentation";
 import { ChevronLeftIcon, WarningIcon } from "./ui/icons";
 
 type RouteWithEvaluation = {
@@ -77,9 +81,16 @@ export default function EvacuationPanel({
 }: {
   position: LatLng;
   onClose: () => void;
-  /** ルート一覧が変化するたびに呼ばれる。地図への描画はMapView側で行う。 */
+  /** ルート一覧が変化するたびに呼ばれる。地図への描画はMapView側で行う。
+   *  riskSegmentsは選択中ルートの区間別リスク評価(DEM＋洪水＋内水氾濫)。
+   *  未評価/評価中/取得失敗の場合はnull(地図側は従来の単色ルート表示のままにする)。 */
   onRoutesChange: (
-    data: { routes: WalkingRoute[]; highlightedIndex: number; destination: FloodShelterCandidate } | null
+    data: {
+      routes: WalkingRoute[];
+      highlightedIndex: number;
+      destination: FloodShelterCandidate;
+      riskSegments?: RouteRiskSegment[] | null;
+    } | null
   ) => void;
   /** 試作3 PART A-1: 選択中のルートでナビを開始する（MapView側で画面を切り替える）。 */
   onStartNavigation: (route: WalkingRoute, destination: FloodShelterCandidate) => void;
@@ -107,6 +118,19 @@ export default function EvacuationPanel({
   // EvacuationPanel自体のview(candidates/routes/routeDetail)とは独立させ、
   // 既存のビュー遷移ロジックには手を加えない(詳細モーダルは重ねて開くだけ)。
   const [detailShelter, setDetailShelter] = useState<FloodShelterCandidate | null>(null);
+
+  // DEM標高＋洪水・内水氾濫による区間別リスク評価(routeDetailを開いた時だけ実行)。
+  // 【重要】既存のルート取得・ハザード評価(routeResults)には一切影響しない
+  // 付加情報。失敗してもルート表示自体は壊さない。
+  const [segmentRisk, setSegmentRisk] = useState<RouteRiskSegment[] | null>(null);
+  const [segmentRiskLoading, setSegmentRiskLoading] = useState(false);
+  const [segmentRiskError, setSegmentRiskError] = useState<string | null>(null);
+  const [expandedSegmentIndex, setExpandedSegmentIndex] = useState<number | null>(null);
+  // ルートA→すぐルートBのように切り替えた場合、古い評価が後から返ってきて
+  // 新しい結果を上書きしないようにするためのrequest-idパターン
+  // (findFloodShelterCandidates等で使っているcancelledフラグと同じ考え方だが、
+  // イベントハンドラ(openRouteDetail)から呼ぶためuseEffectのcleanupが使えず、refで代用する)。
+  const segmentRiskRequestIdRef = useRef(0);
 
   useEffect(() => {
     // candidatesLoadingはuseState(true)で既に初期値trueであり、このeffectは
@@ -136,10 +160,11 @@ export default function EvacuationPanel({
         routes: routeResults.map((r) => r.route),
         highlightedIndex: selectedIndex,
         destination: destination!,
+        riskSegments: segmentRisk,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeResults, selectedIndex]);
+  }, [routeResults, selectedIndex, segmentRisk]);
 
   const handleSelectCandidate = async (candidate: FloodShelterCandidate) => {
     // 同じ避難先へのリクエストが既に進行中/完了済みなら、ビューだけ切り替えて再取得しない
@@ -153,6 +178,13 @@ export default function EvacuationPanel({
     setRoutingLoading(true);
     setRoutesError(null);
     setRouteResults(null);
+    // 別の避難先へ切り替えた場合、前の避難先のルートに対する区間リスク評価を
+    // 引き継がない(誤って別ルートの評価として表示されるのを防ぐ)。
+    segmentRiskRequestIdRef.current++;
+    setSegmentRisk(null);
+    setSegmentRiskError(null);
+    setSegmentRiskLoading(false);
+    setExpandedSegmentIndex(null);
 
     const fetchResult = await fetchWalkingRoutes(position, {
       lat: candidate.lat,
@@ -202,6 +234,28 @@ export default function EvacuationPanel({
       );
     }
     setView("routeDetail");
+
+    // DEM標高＋洪水・内水氾濫による区間別リスク評価(このルートを見ている間だけ)。
+    // 【重要】既存のroutingLoading/hazardEvalLoading/routeResultsとは独立した
+    // 付加評価。失敗してもroutesError/routeResultsには一切触れない。
+    setExpandedSegmentIndex(null);
+    setSegmentRisk(null);
+    setSegmentRiskError(null);
+    if (!r) return;
+    const requestId = ++segmentRiskRequestIdRef.current;
+    setSegmentRiskLoading(true);
+    evaluateRouteSegmentRisk(r.route.geometry)
+      .then((result) => {
+        if (segmentRiskRequestIdRef.current !== requestId) return; // 古いrequestは無視(ルート切り替え済み)
+        setSegmentRisk(result.segments);
+      })
+      .catch(() => {
+        if (segmentRiskRequestIdRef.current !== requestId) return;
+        setSegmentRiskError("ルートは表示できますが、区間ごとのリスク評価を取得できませんでした");
+      })
+      .finally(() => {
+        if (segmentRiskRequestIdRef.current === requestId) setSegmentRiskLoading(false);
+      });
   };
 
   const modalTitle =
@@ -414,12 +468,81 @@ export default function EvacuationPanel({
               実際の浸水区域の境界と厳密には一致しない場合があります。サンプル地点の間に狭い浸水域がある場合、見逃す可能性があります。
             </p>
           </section>
+          <section>
+            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">区間別の参考評価（標高・洪水・内水氾濫）</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
+              標高・洪水・内水氾濫の情報をもとにした、このアプリ独自の参考評価です。実際の道路状況や浸水状況を保証するものではありません。国土地理院・大阪市等のデータを、このアプリが独自に組み合わせて評価したものであり、国や自治体がこの区間を危険と判定しているわけではありません。
+            </p>
+
+            {segmentRiskLoading && (
+              <p className="mt-3 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <span
+                  className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  aria-hidden
+                />
+                ルート周辺のリスクを確認しています…
+              </p>
+            )}
+
+            {segmentRiskError && (
+              <div className="mt-3">
+                <Notice tone="warning" title="区間ごとのリスク評価を取得できませんでした">
+                  {segmentRiskError} ルート自体はそのままご利用いただけます。
+                </Notice>
+              </div>
+            )}
+
+            {segmentRisk && segmentRisk.length > 0 && (
+              <>
+                <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+                  <RouteRiskLegend />
+                </div>
+                <ul className="mt-3 space-y-1.5">
+                  {segmentRisk.map((seg, i) => {
+                    const p = ROUTE_RISK_LEVEL_PRESENTATION[seg.riskLevel];
+                    const expanded = expandedSegmentIndex === i;
+                    return (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSegmentIndex(expanded ? null : i)}
+                          aria-expanded={expanded}
+                          className="flex min-h-11 w-full items-center gap-2.5 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-subtle)]"
+                        >
+                          <svg width="20" height="10" aria-hidden className="shrink-0">
+                            <line
+                              x1="0"
+                              y1="5"
+                              x2="20"
+                              y2="5"
+                              stroke={p.leafletColor}
+                              strokeWidth={4}
+                              strokeDasharray={p.dashed ? "4 3" : undefined}
+                            />
+                          </svg>
+                          <span className="flex-1 text-[var(--color-text-primary)]">
+                            {formatMeters(seg.startDistanceMeters)}〜{formatMeters(seg.endDistanceMeters)}：{p.label}
+                          </span>
+                          <span aria-hidden className="text-[var(--color-text-muted)]">
+                            {expanded ? "▲" : "▼"}
+                          </span>
+                        </button>
+                        {expanded && <RouteRiskDetail segment={seg} />}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </section>
           <section className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3">
             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">データについて</h3>
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
               大阪市の洪水対応指定：あり（国土地理院データ）
               <br />
-              使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域）
+              使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域・内水氾濫浸水想定区域）
+              <br />
+              使用標高データ：国土地理院 標高タイル（基盤地図情報数値標高モデル）を加工して作成。標高は測量時点のものであり、現在の状況を示すリアルタイムデータではありません。
               <br />
               評価時刻：{new Date(routeLog.judgedAt).toLocaleString("ja-JP")}
             </p>

@@ -20,6 +20,8 @@ import { recordRiskHistoryEntry, type RecordRiskHistoryResult } from "@/lib/risk
 import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
+import type { RouteRiskSegment } from "@/lib/routeSegmentRisk";
+import { ROUTE_RISK_LEVEL_PRESENTATION } from "./routeRiskPresentation";
 import type { NavigationDisplayState } from "@/lib/navigation";
 import {
   buildLogEntry,
@@ -110,6 +112,7 @@ export default function MapView() {
     routes: WalkingRoute[];
     highlightedIndex: number;
     destination: FloodShelterCandidate;
+    riskSegments?: RouteRiskSegment[] | null;
   } | null>(null);
   // Phase6.1: 「矩形内＝大阪市内」を意味しない。矩形内(likely_osaka_or_nearby)は
   // 大阪市かどうか確認できていない状態、矩形外(clearly_outside)は明らかに
@@ -322,17 +325,42 @@ export default function MapView() {
           </Marker>
         )}
 
-        {evacuationRoutes?.routes.map((r, i) => (
-          <Polyline
-            key={i}
-            positions={r.geometry.map((p) => [p.lat, p.lng])}
-            pathOptions={
-              i === evacuationRoutes.highlightedIndex
-                ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
-                : { color: "#9ca3af", weight: 3, opacity: 0.6, dashArray: "6 6" }
-            }
-          />
-        ))}
+        {evacuationRoutes?.routes.map((r, i) => {
+          const isHighlighted = i === evacuationRoutes.highlightedIndex;
+          // DEM標高＋洪水・内水氾濫による区間別リスク評価(routeDetailを開いた
+          // ルートのみ)が取得できていれば、選択中ルートだけを区間ごとに
+          // 色分けした複数のPolylineとして描画する。取得できていない/評価中/
+          // 失敗の場合や、選択されていない候補ルートは、従来どおりの単色線のまま
+          // (標高取得の成否でルート自体の表示が変わらないようにするため)。
+          if (isHighlighted && evacuationRoutes.riskSegments && evacuationRoutes.riskSegments.length > 0) {
+            return evacuationRoutes.riskSegments.map((seg, si) => {
+              const p = ROUTE_RISK_LEVEL_PRESENTATION[seg.riskLevel];
+              return (
+                <Polyline
+                  key={`${i}-${si}`}
+                  positions={seg.coordinates.map((pt) => [pt.lat, pt.lng])}
+                  pathOptions={{
+                    color: p.leafletColor,
+                    weight: 5,
+                    opacity: 0.9,
+                    dashArray: p.dashed ? "6 6" : undefined,
+                  }}
+                />
+              );
+            });
+          }
+          return (
+            <Polyline
+              key={i}
+              positions={r.geometry.map((p) => [p.lat, p.lng])}
+              pathOptions={
+                isHighlighted
+                  ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
+                  : { color: "#9ca3af", weight: 3, opacity: 0.6, dashArray: "6 6" }
+              }
+            />
+          );
+        })}
 
         {evacuationRoutes && (
           <Marker
