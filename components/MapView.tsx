@@ -47,9 +47,15 @@ const DEFAULT_ZOOM = 13;
 
 // 試作2（要件定義書2 §5・§32）: 高潮を研究対象から除外したため、
 // ハザード切替UIの選択肢からは高潮を外す。
-// 【重要】components/hazardLayers.ts のHAZARD_BUTTONS自体（高潮のタイルURL等）は
-// 削除していない。ここではUI表示用に絞り込むだけで、データは残す。
-const DISPLAYABLE_HAZARD_BUTTONS = HAZARD_BUTTONS.filter((h) => h.key !== "hightide");
+// 内水氾濫についても、地図上のハザード表示切替からは選択肢を外す
+// （ユーザー指示）。
+// 【重要】components/hazardLayers.ts のHAZARD_BUTTONS自体（高潮・内水氾濫の
+// タイルURL等）は削除していない。ここではUI表示用に絞り込むだけで、
+// lib/riskAssessment.ts・lib/routeSegmentRisk.ts が使う内水氾濫ハザード
+// データ・判定ロジックには影響しない。
+const DISPLAYABLE_HAZARD_BUTTONS = HAZARD_BUTTONS.filter(
+  (h) => h.key !== "hightide" && h.key !== "inundation"
+);
 
 type LatLng = { lat: number; lng: number };
 
@@ -504,7 +510,8 @@ export default function MapView() {
 
           {/* 試作2: 常時2行分の高さを占めていたハザード切替を折りたたみ式にし、
               既定では閉じておく（地図優先）。選択肢は高潮除外により3択に変更。
-              試作3: 全幅バーではなく、地図に浮かせた小型カードに変更。 */}
+              試作3: 全幅バーではなく、地図に浮かせた小型カードに変更。
+              内水氾濫を選択肢から除外したため、現在は2択（表示しない／洪水）。 */}
           <div className="pointer-events-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 shadow-[var(--shadow-sm)]">
             <button
               type="button"
@@ -528,7 +535,7 @@ export default function MapView() {
                 id="hazard-toggle-panel"
                 role="group"
                 aria-label="ハザード情報の表示切り替え"
-                className="grid grid-cols-3 gap-2 px-3 pb-3"
+                className="grid grid-cols-2 gap-2 px-3 pb-3"
               >
                 <button
                   type="button"
