@@ -1,14 +1,29 @@
 // 国土地理院「指定緊急避難場所・指定避難所データ」（大阪市, 市町村コード27100）を
 // アプリで使いやすいJSON形式に変換するスクリプト。
 //
-// 出典データ: https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html
+// 出典データ(基本): https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html
 // 生データは data/raw/ に保存している（利用規約は data/raw/gsi-notice.txt を参照）。
+//
+// 【避難所詳細情報の拡充】大阪市「マップナビおおさか オープンデータ」
+// （防災関連施設ポイントデータ）から、電話番号・避難可能時間・区名・分類を
+// 補完する。出典・ライセンス等は data/README.md 参照。
+// 補完はGSIデータの既存フィールド(id/type/name/address/lat/lng/hazards)を
+// 一切変更せず、追加のoptionalフィールドとしてのみ行う。
+//
+// 【名寄せの方針(安全側)】施設名の完全一致に頼らず、
+// 「座標が近い(120m以内)」かつ「正規化した施設名が一致または包含関係にある」
+// の両方を満たす場合のみ紐付ける。複数のGSI候補があっても、それらが全て
+// 同一施設(名称が同じ、指定緊急避難場所/指定避難所の重複登録等)であれば
+// 安全に全件へ補完する。候補の正規化名が食い違う場合は「あいまい」として
+// 補完せず未マッチのまま残す(誤った電話番号等を付与するくらいなら、
+// 情報を表示しない方を優先する)。
 //
 // 実行方法: node scripts/build-shelters.mjs
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { matchShelterEnrichment } from "../lib/shelterEnrichmentMatching.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rawDir = path.join(__dirname, "..", "data", "raw");
@@ -129,17 +144,88 @@ const shelters = hinanjoRows
     hazards: [],
   }));
 
+const gsiFeatures = [...evacuationSites, ...shelters];
+
+// ============================================================
+// 大阪市「マップナビおおさか オープンデータ」による詳細情報の補完
+// ============================================================
+
+const OSAKA_CITY_CSV_PATH = path.join(rawDir, "osaka-city-opendata-shelters.csv");
+
+let cityRows = [];
+let cityMeta = null;
+try {
+  const cityText = readFileSync(OSAKA_CITY_CSV_PATH, "utf-8");
+  cityRows = parseCsv(cityText);
+} catch {
+  // 大阪市データが無くても、GSIデータだけで従来どおりビルドできるようにする
+  // (このファイルの存在は必須にしない)。
+  console.warn(
+    "[build-shelters] 大阪市オープンデータ(data/raw/osaka-city-opendata-shelters.csv)が見つからないため、詳細情報の補完をスキップします。"
+  );
+}
+
+const cityRecords = cityRows
+  .map((row) => ({
+    name: row["場所の名前"],
+    lat: Number(row["緯度"]),
+    lng: Number(row["経度"]),
+    telephone: row["TEL"],
+    availableHours: row["避難可能時間"],
+    ward: row["区名"],
+    category: row["分類"],
+  }))
+  .filter((r) => r.lat && r.lng);
+
+const { enrichmentByGsiId, report } = matchShelterEnrichment(gsiFeatures, cityRecords);
+
+const featuresWithEnrichment = gsiFeatures.map((f) => {
+  const enrichment = enrichmentByGsiId.get(f.id);
+  return {
+    ...f,
+    telephone: enrichment?.telephone ?? null,
+    availableHours: enrichment?.availableHours ?? null,
+    ward: enrichment?.ward ?? null,
+    category: enrichment?.category ?? null,
+  };
+});
+
+if (cityRows.length > 0) {
+  cityMeta = {
+    source: "大阪市 マップナビおおさか オープンデータ（防災関連施設ポイントデータ）",
+    sourceUrl: "https://www.city.osaka.lg.jp/toshikeikaku/page/0000250227.html",
+    license: "CC BY",
+  };
+
+  console.log("\n[build-shelters] 大阪市データによる名寄せレポート");
+  console.log(`  大阪市データ件数: ${report.totalCityRecords}`);
+  console.log(`  マッチ成功: ${report.matchedCount}`);
+  console.log(`  未マッチ: ${report.unmatchedCount}`);
+  console.log(`  あいまい(要手動確認・補完スキップ): ${report.ambiguousCount}`);
+  console.log(
+    `  複数のGSI候補があった件数(うち同一施設として安全に補完: ${report.multiCandidateCount - report.ambiguousCount}件): ${report.multiCandidateCount}`
+  );
+  if (report.ambiguousSamples.length > 0) {
+    console.log("  あいまい判定の例(最大10件):");
+    for (const s of report.ambiguousSamples) {
+      console.log(`    - 大阪市:「${s.city}」 vs GSI候補:${JSON.stringify(s.gsiCandidates)}`);
+    }
+  }
+}
+
 const output = {
   source: "国土地理院 指定緊急避難場所・指定避難所データ（大阪市, 27100）",
   sourceUrl: "https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html",
   fetchedAt: "2026-09-06",
   notice:
     "本データは各市町村の登録情報のため最新でない場合があります。詳細・最新情報は大阪市の発表をご確認ください。",
-  features: [...evacuationSites, ...shelters],
+  // 電話番号・避難可能時間・区名・分類は大阪市データで補完できた場合のみ。
+  enrichment: cityMeta,
+  features: featuresWithEnrichment,
 };
 
 writeFileSync(outPath, JSON.stringify(output), "utf-8");
 
 console.log(
-  `書き出し完了: ${output.features.length}件 (避難場所 ${evacuationSites.length} / 避難所 ${shelters.length}) -> ${outPath}`
+  `\n書き出し完了: ${output.features.length}件 (避難場所 ${evacuationSites.length} / 避難所 ${shelters.length}) -> ${outPath}`
 );

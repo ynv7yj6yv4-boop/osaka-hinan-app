@@ -19,6 +19,12 @@ export type ShelterFeature = {
   lat: number;
   lng: number;
   hazards: string[];
+  // 避難所詳細情報の拡充: 大阪市オープンデータで補完できた場合のみ値が入る。
+  // 名寄せできなかった場合はすべてnull(推測で埋めない)。
+  telephone?: string | null;
+  availableHours?: string | null;
+  ward?: string | null;
+  category?: string | null;
 };
 
 export type FloodShelterCandidate = {
@@ -29,6 +35,12 @@ export type FloodShelterCandidate = {
   lng: number;
   /** 現在地からの直線距離（メートル）。道なりの距離ではないことに注意 */
   straightLineDistanceMeters: number;
+  type: "shelter" | "evacuation_site";
+  hazards: string[];
+  telephone: string | null;
+  availableHours: string | null;
+  ward: string | null;
+  category: string | null;
 };
 
 // 候補として表示する件数。卒論の検証等で変更しやすいよう定数化している。
@@ -93,6 +105,12 @@ export async function findFloodShelterCandidates(
     lat: s.lat,
     lng: s.lng,
     straightLineDistanceMeters: haversineDistanceMeters(position, s),
+    type: s.type,
+    hazards: s.hazards,
+    telephone: s.telephone ?? null,
+    availableHours: s.availableHours ?? null,
+    ward: s.ward ?? null,
+    category: s.category ?? null,
   }));
 
   withDistance.sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters);

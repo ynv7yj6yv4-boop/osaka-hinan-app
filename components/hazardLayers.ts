@@ -31,3 +31,12 @@ export const HAZARD_BUTTONS: { key: HazardKey; label: string; emoji: string }[] 
 
 export const HAZARD_ATTRIBUTION =
   '出典：<a href="https://disaportal.gsi.go.jp/" target="_blank" rel="noopener noreferrer">ハザードマップポータルサイト</a>（国土交通省）';
+
+// 避難所データのhazards配列(GSIの8種の災害種別コード)を、日本語ラベルの
+// 配列に変換する共通ヘルパー。HAZARD_LABELSに無いキーは黙って除外する
+// (存在しない災害種別を勝手に補わない)。
+export function toHazardLabels(hazards: string[]): string[] {
+  return hazards
+    .map((h) => HAZARD_LABELS[h as keyof typeof HAZARD_LABELS])
+    .filter((label): label is string => Boolean(label));
+}

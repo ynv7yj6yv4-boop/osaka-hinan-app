@@ -7,7 +7,7 @@ import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import type { HazardKey } from "./hazardLayers";
-import { HAZARD_LABELS } from "./hazardLayers";
+import { toHazardLabels } from "./hazardLayers";
 
 type ShelterFeature = {
   id: string;
@@ -17,6 +17,8 @@ type ShelterFeature = {
   lat: number;
   lng: number;
   hazards: HazardKey[];
+  telephone?: string | null;
+  availableHours?: string | null;
 };
 
 type SheltersData = {
@@ -47,9 +49,10 @@ function makeIcon(kind: "shelter" | "safe" | "other") {
   });
 }
 
-function hazardLabelList(hazards: HazardKey[]): string {
-  if (hazards.length === 0) return "災害種別の指定なし";
-  return hazards.map((h) => HAZARD_LABELS[h]).join("・");
+function hazardLabelText(hazards: HazardKey[]): string {
+  const labels = toHazardLabels(hazards);
+  if (labels.length === 0) return "災害種別の指定なし";
+  return labels.join("・");
 }
 
 export default function ShelterLayer({ activeHazard }: { activeHazard: HazardKey | null }) {
@@ -84,12 +87,18 @@ export default function ShelterLayer({ activeHazard }: { activeHazard: HazardKey
 
       const marker = L.marker([f.lat, f.lng], { icon });
       const typeLabel = f.type === "shelter" ? "指定避難所" : "指定緊急避難場所";
+      // 避難所詳細情報の拡充: 大阪市オープンデータで補完できた場合のみ、
+      // 電話番号・避難可能時間を追記する(無ければ何も足さない。推測しない)。
+      const telephoneLine = f.telephone ? `電話：${f.telephone}<br/>` : "";
+      const availableHoursLine = f.availableHours ? `利用可能時間：${f.availableHours}<br/>` : "";
       marker.bindPopup(
         `<div style="font-size:14px;line-height:1.5;">
           <strong>${f.name}</strong><br/>
           ${typeLabel}<br/>
           ${f.address}<br/>
-          ${f.type === "evacuation_site" ? `対応災害：${hazardLabelList(f.hazards)}` : ""}
+          ${f.type === "evacuation_site" ? `対応災害：${hazardLabelText(f.hazards)}<br/>` : ""}
+          ${telephoneLine}
+          ${availableHoursLine}
         </div>`
       );
       group.addLayer(marker);

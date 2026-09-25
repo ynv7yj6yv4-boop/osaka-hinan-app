@@ -16,6 +16,8 @@ import { buildRouteJudgmentLog, type RouteJudgmentLog } from "@/lib/routeJudgmen
 import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Notice from "./ui/Notice";
+import ShelterDetailContent from "./ShelterDetailContent";
+import { toHazardLabels } from "./hazardLayers";
 import { ChevronLeftIcon, WarningIcon } from "./ui/icons";
 
 type RouteWithEvaluation = {
@@ -23,7 +25,7 @@ type RouteWithEvaluation = {
   evaluation: RouteHazardEvaluation;
 };
 
-type View = "candidates" | "routes" | "routeDetail";
+type View = "candidates" | "routes" | "routeDetail" | "shelterDetail";
 
 const ROUTE_LABELS = ["ルートA", "ルートB", "ルートC"];
 
@@ -64,6 +66,7 @@ const VIEW_TITLE: Record<View, string> = {
   candidates: "近くの洪水対応避難先",
   routes: "洪水の参考避難ルート",
   routeDetail: "ルート詳細",
+  shelterDetail: "避難先の詳細",
 };
 
 export default function EvacuationPanel({
@@ -99,6 +102,11 @@ export default function EvacuationPanel({
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [routeLog, setRouteLog] = useState<RouteJudgmentLog | null>(null);
+
+  // 避難所詳細情報の拡充: 候補一覧から個別の詳細を確認するための状態。
+  // EvacuationPanel自体のview(candidates/routes/routeDetail)とは独立させ、
+  // 既存のビュー遷移ロジックには手を加えない(詳細モーダルは重ねて開くだけ)。
+  const [detailShelter, setDetailShelter] = useState<FloodShelterCandidate | null>(null);
 
   useEffect(() => {
     // candidatesLoadingはuseState(true)で既に初期値trueであり、このeffectは
@@ -196,6 +204,13 @@ export default function EvacuationPanel({
     setView("routeDetail");
   };
 
+  const modalTitle =
+    view === "routeDetail"
+      ? `${ROUTE_LABELS[selectedIndex] ?? "ルート"}について`
+      : view === "shelterDetail"
+        ? (detailShelter?.name ?? VIEW_TITLE.shelterDetail)
+        : VIEW_TITLE[view];
+
   return (
     <Modal
       onClose={handleClose}
@@ -212,7 +227,7 @@ export default function EvacuationPanel({
           </button>
         ) : undefined
       }
-      title={view === "routeDetail" ? `${ROUTE_LABELS[selectedIndex] ?? "ルート"}について` : VIEW_TITLE[view]}
+      title={modalTitle}
     >
       {view === "candidates" && (
         <div>
@@ -237,20 +252,41 @@ export default function EvacuationPanel({
           )}
           <ul className="mt-3 space-y-2.5">
             {candidates?.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => handleSelectCandidate(c)}
-                  className="w-full rounded-[var(--radius-md)] border-2 border-[var(--color-border)] p-3.5 text-left transition-colors hover:border-[var(--color-primary-border)] hover:bg-[var(--color-primary-surface)] active:bg-[var(--color-primary-surface)]"
-                >
-                  <div className="text-base font-bold text-[var(--color-text-primary)]">{c.name}</div>
-                  <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    直線距離：約{formatMeters(c.straightLineDistanceMeters)}
-                  </div>
-                  <div className="mt-1 text-sm text-[var(--color-info)]">大阪市の洪水対応指定あり</div>
-                  <div className="mt-1 text-xs text-[var(--color-text-muted)]">{c.address}</div>
-                  <div className="mt-2 text-sm font-bold text-[var(--color-primary)]">この避難先までのルートを見る →</div>
-                </button>
+              <li key={c.id} className="rounded-[var(--radius-md)] border-2 border-[var(--color-border)] p-3.5">
+                <div className="text-base font-bold text-[var(--color-text-primary)]">{c.name}</div>
+                <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  直線距離：約{formatMeters(c.straightLineDistanceMeters)}
+                </div>
+                <div className="mt-1 text-sm text-[var(--color-info)]">大阪市の洪水対応指定あり</div>
+                {toHazardLabels(c.hazards).length > 0 && (
+                  <ul className="mt-1.5 flex flex-wrap gap-1">
+                    {toHazardLabels(c.hazards).map((label) => (
+                      <li
+                        key={label}
+                        className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2 py-0.5 text-xs font-bold text-[var(--color-text-primary)]"
+                      >
+                        {label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {/* 電話番号・利用可能時間はここには表示せず、詳細画面へ分離する(§19)。 */}
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    onClick={() => {
+                      setDetailShelter(c);
+                      setView("shelterDetail");
+                    }}
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    詳細を見る
+                  </Button>
+                  <Button onClick={() => handleSelectCandidate(c)} size="sm" className="flex-1">
+                    ルートを見る
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -409,6 +445,16 @@ export default function EvacuationPanel({
             ルート一覧に戻る
           </Button>
         </div>
+      )}
+
+      {view === "shelterDetail" && detailShelter && (
+        <ShelterDetailContent
+          shelter={detailShelter}
+          onViewRoute={() => {
+            const shelter = detailShelter;
+            handleSelectCandidate(shelter);
+          }}
+        />
       )}
     </Modal>
   );
