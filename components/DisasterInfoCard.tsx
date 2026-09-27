@@ -12,6 +12,13 @@
 // 差し替えるだけでよく、このUI（ExternalDisasterInfoCard）はstatusTone・
 // statusLabel・fetchedAtを渡し替えるだけで、そのまま実データ表示に拡張できる。
 //
+// 【重要・2026-09-30】「道路情報」セクションは一時的にUIから外している。
+// 掲載していた2件のリンクが実機（iPhone）で正しく表示できないことが確認され
+// 削除し、その結果リンク・説明文とも空になり表示する意味のある情報が
+// 残らなくなったため。lib/road/（types.ts・provider.ts）自体は削除しておらず、
+// 実機で問題なく開ける公式URLが見つかり次第、ここでgetRoadRestriction()を
+// 呼び出す形に戻すだけで再表示できる。
+//
 // 【重要・混同防止】ここでの「避難所情報」は避難所の開設・混雑状況という
 // 外部リンクへの入口であり、地図上に表示されている既存の避難所データ
 // （ShelterLayer・floodShelterCandidates等）そのものではない。既存の
@@ -26,7 +33,6 @@
 
 import { useEffect, useId, useState } from "react";
 import { getRiverStatus } from "@/lib/river/provider";
-import { getRoadRestriction } from "@/lib/road/provider";
 import { getShelterStatus } from "@/lib/shelter-status/provider";
 import ExternalDisasterInfoCard from "./ExternalDisasterInfoCard";
 import Modal from "./ui/Modal";
@@ -36,7 +42,6 @@ export default function DisasterInfoCard() {
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [river, setRiver] = useState<Awaited<ReturnType<typeof getRiverStatus>> | null>(null);
-  const [road, setRoad] = useState<Awaited<ReturnType<typeof getRoadRestriction>> | null>(null);
   const [shelter, setShelter] = useState<Awaited<ReturnType<typeof getShelterStatus>> | null>(null);
 
   // 【重要】各Providerは常にstatus="unknown"を即座に返すだけで、実際の
@@ -45,9 +50,6 @@ export default function DisasterInfoCard() {
     let cancelled = false;
     getRiverStatus().then((result) => {
       if (!cancelled) setRiver(result);
-    });
-    getRoadRestriction().then((result) => {
-      if (!cancelled) setRoad(result);
     });
     getShelterStatus().then((result) => {
       if (!cancelled) setShelter(result);
@@ -89,17 +91,6 @@ export default function DisasterInfoCard() {
                 description="河川の水位やライブカメラ情報は公式情報をご確認ください。"
                 sourceLinks={river.sources}
                 fetchedAt={river.fetchedAt}
-              />
-            )}
-
-            {road && (
-              <ExternalDisasterInfoCard
-                title="道路情報"
-                statusTone="unknown"
-                statusLabel="規制情報は未連携"
-                description="通行止め・冠水等の道路規制情報は公式情報をご確認ください。"
-                sourceLinks={road.sources}
-                fetchedAt={road.fetchedAt}
               />
             )}
 

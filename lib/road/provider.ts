@@ -10,11 +10,13 @@
 
 import type { RoadRestriction, RoadRestrictionSource } from "./types.ts";
 
-// 前回の調査（2026-09-28）で実際にアクセスし、内容を確認済みの公式サイトのみを列挙する。
-const ROAD_INFO_SOURCES: RoadRestrictionSource[] = [
-  { name: "近畿地方整備局 大阪国道事務所 道路交通情報", url: "https://www.kkr.mlit.go.jp/osaka/koutu_info/" },
-  { name: "JARTIC 交通規制情報（オープンデータ）", url: "https://www.jartic.or.jp/service/opendata/" },
-];
+// 【重要・2026-09-30】以前は下記2件のリンクを掲載していたが、実機（iPhone）で
+// 開いた際に内容が正しく表示できないことが確認されたため削除した。
+// HTTPステータス自体は200を返す（技術的な意味でのリンク切れではない）ため、
+// 前回のOsaka市ホームページ404のケースとは異なり、代替URLを推測して補うことも
+// しない（存在しない情報を作らない方針）。sources=[]の間は
+// ExternalDisasterInfoCard側が空配列を検出しリンク一覧自体を表示しない。
+const ROAD_INFO_SOURCES: RoadRestrictionSource[] = [];
 
 export async function getRoadRestriction(roadName: string | null = null): Promise<RoadRestriction> {
   return {
