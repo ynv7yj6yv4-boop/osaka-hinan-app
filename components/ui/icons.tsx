@@ -107,3 +107,12 @@ export function BellIcon({ className, style }: IconProps) {
     </svg>
   );
 }
+
+export function LayersIcon({ className, style }: IconProps) {
+  return (
+    <svg {...common} className={className} style={style}>
+      <polygon points="12 3.5 20.5 8.5 12 13.5 3.5 8.5 12 3.5" />
+      <polyline points="3.5 14.5 12 19.5 20.5 14.5" />
+    </svg>
+  );
+}

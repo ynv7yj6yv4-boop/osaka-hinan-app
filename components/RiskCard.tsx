@@ -12,6 +12,13 @@
 // 使うため、"高リスクだけ"のような判定レベル固有の分岐は持たない。
 // 開閉状態はReact stateのみで保持し(要望によりlocalStorageへは保存しない)、
 // 初期状態はモバイル・PC問わず常に折りたたみとする(実装をシンプルに保つ)。
+//
+// スマートフォンUI改善(地図面積の最大化): 折りたたみ時の目安高さを
+// 70〜100px程度まで縮めるため、「現在地の災害リスク（参考評価）」という
+// キャプションと一文説明も折りたたみ時には表示せず、アイコン＋リスク名＋
+// 開閉ボタンの1行だけにした。キャプション・説明文は展開時の先頭に移動して
+// おり、情報を削除したわけではない。折りたたみ時もスクリーンリーダー
+// 利用者が文脈を失わないよう、ボタンのaria-labelに補う。
 
 import { useId, useState } from "react";
 import type { RiskResult } from "@/lib/riskAssessment";
@@ -71,17 +78,14 @@ export default function RiskCard({
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-controls={detailSectionId}
-        className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors active:opacity-90"
+        aria-label={`現在地の災害リスク：${p.label}。${expanded ? "詳細を閉じる" : "詳細を見る"}`}
+        className="flex min-h-11 w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors active:opacity-90"
       >
-        <Icon className="mt-0.5 h-7 w-7 shrink-0" style={{ color: p.fg }} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-medium text-[var(--color-text-secondary)]">現在地の災害リスク（参考評価）</span>
-          <span className="mt-0.5 block text-xl font-bold" style={{ color: p.fg }}>
-            {p.label}
-          </span>
-          <span className="mt-1 block text-sm leading-snug text-[var(--color-text-primary)]">{p.summary}</span>
+        <Icon className="h-6 w-6 shrink-0" style={{ color: p.fg }} />
+        <span className="flex-1 truncate text-base font-bold" style={{ color: p.fg }}>
+          {p.label}
         </span>
-        <span className="mt-0.5 flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">
+        <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">
           {expanded ? "閉じる" : "詳細を見る"}
           <ChevronDownIcon
             className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
@@ -91,7 +95,9 @@ export default function RiskCard({
 
       {expanded && (
         <div id={detailSectionId} className="px-4 pb-3.5">
-          <span className="block text-xs leading-snug text-[var(--color-text-secondary)]">{targetHazardText(result)}</span>
+          <span className="block text-xs font-medium text-[var(--color-text-secondary)]">現在地の災害リスク（参考評価）</span>
+          <span className="mt-1 block text-sm leading-snug text-[var(--color-text-primary)]">{p.summary}</span>
+          <span className="mt-2 block text-xs leading-snug text-[var(--color-text-secondary)]">{targetHazardText(result)}</span>
           {comparison && (
             <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug">
               <span className="flex items-center gap-1 font-bold" style={{ color: RISK_COMPARISON_TONE_COLOR[describeRiskComparison(comparison.comparison).tone] }}>

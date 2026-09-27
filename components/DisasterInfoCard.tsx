@@ -17,19 +17,24 @@
 // （ShelterLayer・floodShelterCandidates等）そのものではない。既存の
 // 避難所表示・避難ルート評価には一切触れていない。
 //
-// 既存のRiskCardと同じ折りたたみパターン（要約行をbuttonにし、
-// aria-expanded/aria-controlsで詳細を開閉）を踏襲している。
+// スマートフォンUI改善(地図面積の最大化): 以前はRiskCardと同じ
+// インライン折りたたみだったが、河川・道路・避難所の3ブロックを開くと
+// 縦に長くなり地図中央を覆いやすいため、コンパクトな1行ボタン＋
+// Bottom Sheet（既存のui/Modal.tsx。モバイルでは画面下から開くシートに
+// なる既存実装をそのまま再利用）に変更した。中身の情報・文言・Provider
+// との接続方法は変更していない。
 
 import { useEffect, useId, useState } from "react";
 import { getRiverStatus } from "@/lib/river/provider";
 import { getRoadRestriction } from "@/lib/road/provider";
 import { getShelterStatus } from "@/lib/shelter-status/provider";
 import ExternalDisasterInfoCard from "./ExternalDisasterInfoCard";
+import Modal from "./ui/Modal";
 import { InfoIcon, ChevronDownIcon } from "./ui/icons";
 
 export default function DisasterInfoCard() {
-  const cardId = useId();
-  const [expanded, setExpanded] = useState(false);
+  const titleId = useId();
+  const [open, setOpen] = useState(false);
   const [river, setRiver] = useState<Awaited<ReturnType<typeof getRiverStatus>> | null>(null);
   const [road, setRoad] = useState<Awaited<ReturnType<typeof getRoadRestriction>> | null>(null);
   const [shelter, setShelter] = useState<Awaited<ReturnType<typeof getShelterStatus>> | null>(null);
@@ -52,72 +57,65 @@ export default function DisasterInfoCard() {
     };
   }, []);
 
-  const detailSectionId = `${cardId}-detail`;
-
   return (
-    <div className="mt-2 rounded-[var(--radius-lg)] border-2 border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]">
+    <>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        aria-controls={detailSectionId}
-        className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors active:opacity-90"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="flex min-h-11 w-full items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 px-3.5 py-2 text-left shadow-[var(--shadow-sm)]"
       >
-        <InfoIcon className="mt-0.5 h-6 w-6 shrink-0 text-[var(--color-text-secondary)]" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-medium text-[var(--color-text-secondary)]">災害関連情報</span>
-          <span className="mt-0.5 block text-sm leading-snug text-[var(--color-text-primary)]">
-            河川・道路・避難所の公式情報へのリンク
-          </span>
-        </span>
-        <span className="mt-0.5 flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">
-          {expanded ? "閉じる" : "詳細を見る"}
-          <ChevronDownIcon
-            className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
-          />
+        <InfoIcon className="h-5 w-5 shrink-0 text-[var(--color-text-secondary)]" />
+        <span className="flex-1 truncate text-sm font-bold text-[var(--color-text-primary)]">災害関連情報</span>
+        <span className="flex shrink-0 items-center gap-0.5 text-xs font-bold text-[var(--color-primary)]">
+          詳細を見る
+          <ChevronDownIcon className="h-4 w-4 shrink-0 -rotate-90" />
         </span>
       </button>
 
-      {expanded && (
-        <div id={detailSectionId} className="space-y-2.5 px-4 pb-3.5">
-          <p className="text-xs leading-snug text-[var(--color-text-secondary)]">
-            このアプリでは一部のリアルタイム情報を自動取得していません。災害時は自治体・気象庁・国土交通省等の公式情報を必ず確認してください。
-          </p>
+      {open && (
+        <Modal title="災害関連情報" labelledBy={titleId} onClose={() => setOpen(false)}>
+          <div className="space-y-2.5">
+            <p className="text-xs leading-snug text-[var(--color-text-secondary)]">
+              このアプリでは一部のリアルタイム情報を自動取得していません。災害時は自治体・気象庁・国土交通省等の公式情報を必ず確認してください。
+            </p>
 
-          {river && (
-            <ExternalDisasterInfoCard
-              title="河川情報"
-              statusTone="unknown"
-              statusLabel="リアルタイム情報は未連携"
-              description="河川の水位やライブカメラ情報は公式情報をご確認ください。"
-              sourceLinks={river.sources}
-              fetchedAt={river.fetchedAt}
-            />
-          )}
+            {river && (
+              <ExternalDisasterInfoCard
+                title="河川情報"
+                statusTone="unknown"
+                statusLabel="リアルタイム情報は未連携"
+                description="河川の水位やライブカメラ情報は公式情報をご確認ください。"
+                sourceLinks={river.sources}
+                fetchedAt={river.fetchedAt}
+              />
+            )}
 
-          {road && (
-            <ExternalDisasterInfoCard
-              title="道路情報"
-              statusTone="unknown"
-              statusLabel="規制情報は未連携"
-              description="通行止め・冠水等の道路規制情報は公式情報をご確認ください。"
-              sourceLinks={road.sources}
-              fetchedAt={road.fetchedAt}
-            />
-          )}
+            {road && (
+              <ExternalDisasterInfoCard
+                title="道路情報"
+                statusTone="unknown"
+                statusLabel="規制情報は未連携"
+                description="通行止め・冠水等の道路規制情報は公式情報をご確認ください。"
+                sourceLinks={road.sources}
+                fetchedAt={road.fetchedAt}
+              />
+            )}
 
-          {shelter && (
-            <ExternalDisasterInfoCard
-              title="避難所の開設状況"
-              statusTone="unknown"
-              statusLabel="リアルタイム情報は未連携"
-              description="避難所の開設状況は、自治体の公式情報をご確認ください。"
-              sourceLinks={shelter.sources}
-              fetchedAt={shelter.fetchedAt}
-            />
-          )}
-        </div>
+            {shelter && (
+              <ExternalDisasterInfoCard
+                title="避難所の開設状況"
+                statusTone="unknown"
+                statusLabel="リアルタイム情報は未連携"
+                description="避難所の開設状況は、自治体の公式情報をご確認ください。"
+                sourceLinks={shelter.sources}
+                fetchedAt={shelter.fetchedAt}
+              />
+            )}
+          </div>
+        </Modal>
       )}
-    </div>
+    </>
   );
 }
