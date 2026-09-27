@@ -33,7 +33,8 @@ export type RiverStatus = {
   level: RiverStatusLevel;
   /** 実データを取得できた日時（ISO8601）。取得していない/できない場合はnull。 */
   fetchedAt: string | null;
-  source: RiverStatusSource;
+  /** 実際にアクセスして確認済みの公式サイトへのリンク（複数可）。 */
+  sources: RiverStatusSource[];
   /** 利用者向けの注記（例:「自動取得未対応のため公式サイトをご確認ください」）。 */
   note: string;
 };

@@ -10,17 +10,18 @@
 
 import type { RoadRestriction, RoadRestrictionSource } from "./types.ts";
 
-const OSAKA_KOKUDO_JIMUSHO_SOURCE: RoadRestrictionSource = {
-  name: "近畿地方整備局 大阪国道事務所 道路交通情報",
-  url: "https://www.kkr.mlit.go.jp/osaka/koutu_info/",
-};
+// 前回の調査（2026-09-28）で実際にアクセスし、内容を確認済みの公式サイトのみを列挙する。
+const ROAD_INFO_SOURCES: RoadRestrictionSource[] = [
+  { name: "近畿地方整備局 大阪国道事務所 道路交通情報", url: "https://www.kkr.mlit.go.jp/osaka/koutu_info/" },
+  { name: "JARTIC 交通規制情報（オープンデータ）", url: "https://www.jartic.or.jp/service/opendata/" },
+];
 
 export async function getRoadRestriction(roadName: string | null = null): Promise<RoadRestriction> {
   return {
     roadName,
     severity: "unknown",
     fetchedAt: null,
-    source: OSAKA_KOKUDO_JIMUSHO_SOURCE,
+    sources: ROAD_INFO_SOURCES,
     note: "道路の通行止め・冠水等の規制情報の自動取得は未対応です。最新の状況は公式サイトでご確認ください。",
   };
 }

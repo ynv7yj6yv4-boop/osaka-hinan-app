@@ -29,6 +29,7 @@ export type RoadRestriction = {
   roadName: string | null;
   severity: RoadRestrictionSeverity;
   fetchedAt: string | null;
-  source: RoadRestrictionSource;
+  /** 実際にアクセスして確認済みの公式サイトへのリンク（複数可）。 */
+  sources: RoadRestrictionSource[];
   note: string;
 };

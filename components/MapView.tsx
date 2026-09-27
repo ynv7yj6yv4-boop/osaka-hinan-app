@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
 import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
 import RiskCard from "./RiskCard";
+import DisasterInfoCard from "./DisasterInfoCard";
 import RiskDetailModal from "./RiskDetailModal";
 import EvacuationPanel from "./EvacuationPanel";
 import IntroPanel from "./IntroPanel";
@@ -427,8 +428,14 @@ export default function MapView() {
           paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
         }}
       >
-        {/* 上グループ：ヘッダー・地域案内・RiskCard */}
-        <div className="flex flex-col gap-2">
+        {/* 上グループ：ヘッダー・地域案内・RiskCard・災害関連情報カード。
+            災害関連情報カードの追加により、RiskCard・DisasterInfoCardが
+            両方展開されると縦向きの画面高さを超えることがあるため、この
+            グループ自体をmin-h-0+overflow-y-autoでスクロール可能にし、
+            下グループ（洪水CTA・ハザード切替・再取得ボタン等）が画面外に
+            押し出されたり内容と重なったりしないようにしている
+            （下グループ側はshrink-0で高さを維持）。 */}
+        <div className="pointer-events-auto flex min-h-0 flex-col gap-2 overflow-y-auto">
           {/* アプリ名 + 短い常時免責（要件定義書2 I-6: 詳細はRiskDetailModal側に集約）。
               横向きは画面高さに余裕がなく、CTA・ハザード切替が画面外に押し出されて
               しまうため、ユーザーとの合意により横向き時のみ非表示にする
@@ -477,12 +484,18 @@ export default function MapView() {
               comparison={riskComparison}
             />
           </div>
+
+          {/* 河川・道路・避難所の公式情報リンク（リアルタイム自動取得は未対応）。
+              既存のRiskCard・判定ロジック・避難所データには一切触れていない。 */}
+          <div className="pointer-events-auto">
+            <DisasterInfoCard />
+          </div>
         </div>
 
         {/* 下グループ：洪水CTA・ハザード切替・エラー表示
             縦向きは現在地取得ボタンとの重なりを避けるため右側を空ける。
             横向きは既に左側の細い帯に収まっているため、その余白は不要。 */}
-        <div className="flex flex-col gap-2 pr-20 [@media(orientation:landscape)]:pr-0">
+        <div className="flex shrink-0 flex-col gap-2 pr-20 [@media(orientation:landscape)]:pr-0">
           {position && (
             <div className="pointer-events-auto">
               {/* Phase6.1: 現在の主なリスクが洪水以外(内水氾濫)の場合、

@@ -27,11 +27,16 @@ export type ShelterStatusSource = {
 };
 
 export type ShelterStatus = {
-  /** 対象避難所名。既存のFloodShelterCandidate等と名称で紐付けることを想定。 */
-  shelterName: string;
+  /**
+   * 対象避難所名。既存のFloodShelterCandidate等と名称で紐付けることを想定。
+   * 特定の避難所を指定しない場合（例:「避難所全般の開設状況について」を
+   * 案内するUI）はnull。
+   */
+  shelterName: string | null;
   openStatus: ShelterOpenStatus;
   congestion?: ShelterCongestion;
   fetchedAt: string | null;
-  source: ShelterStatusSource;
+  /** 実際にアクセスして確認済みの公式サイトへのリンク（複数可）。 */
+  sources: ShelterStatusSource[];
   note: string;
 };

@@ -10,17 +10,18 @@
 
 import type { RiverStatus, RiverStatusSource } from "./types.ts";
 
-const OSAKA_RIVER_PORTAL_SOURCE: RiverStatusSource = {
-  name: "大阪府河川防災情報ポータル",
-  url: "https://www.osaka-kasen-portal.net/",
-};
+// 前回の調査（2026-09-28）で実際にアクセスし、内容を確認済みの公式サイトのみを列挙する。
+const RIVER_INFO_SOURCES: RiverStatusSource[] = [
+  { name: "国土交通省 川の防災情報", url: "https://www.river.go.jp/" },
+  { name: "大阪府河川防災情報ポータル", url: "https://www.osaka-kasen-portal.net/" },
+];
 
 export async function getRiverStatus(riverName: string | null = null): Promise<RiverStatus> {
   return {
     riverName,
     level: "unknown",
     fetchedAt: null,
-    source: OSAKA_RIVER_PORTAL_SOURCE,
+    sources: RIVER_INFO_SOURCES,
     note: "河川の水位・監視カメラ情報の自動取得は未対応です。最新の状況は公式サイトでご確認ください。",
   };
 }

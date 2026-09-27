@@ -7,7 +7,8 @@ test("道路規制: 現時点では常にunknownを返し、'安全'相当の値
   assert.equal(result.severity, "unknown");
   assert.equal(result.roadName, "国道2号");
   assert.equal(result.fetchedAt, null);
-  assert.ok(result.source.url.startsWith("https://"));
+  assert.ok(result.sources.length > 0);
+  assert.ok(result.sources.every((s) => s.url.startsWith("https://")));
   assert.ok(result.note.length > 0);
 });
 

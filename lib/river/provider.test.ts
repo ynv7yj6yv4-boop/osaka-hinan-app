@@ -7,7 +7,8 @@ test("河川状況: 現時点では常にunknownを返し、断定的な安全/�
   assert.equal(result.level, "unknown");
   assert.equal(result.riverName, "淀川");
   assert.equal(result.fetchedAt, null);
-  assert.ok(result.source.url.startsWith("https://"));
+  assert.ok(result.sources.length > 0);
+  assert.ok(result.sources.every((s) => s.url.startsWith("https://")));
   assert.ok(result.note.length > 0);
 });
 

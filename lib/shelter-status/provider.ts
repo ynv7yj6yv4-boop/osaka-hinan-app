@@ -10,18 +10,18 @@
 
 import type { ShelterStatus, ShelterStatusSource } from "./types.ts";
 
-const OSAKA_BOUSAI_NET_SHELTER_SEARCH_SOURCE: ShelterStatusSource = {
-  name: "おおさか防災ネット 避難所検索",
-  url: "https://www.osaka-bousai.net/shelter/index.html",
-};
+// 前回の調査（2026-09-28）で実際にアクセスし、内容を確認済みの公式サイトのみを列挙する。
+const SHELTER_STATUS_SOURCES: ShelterStatusSource[] = [
+  { name: "おおさか防災ネット 避難所検索", url: "https://www.osaka-bousai.net/shelter/index.html" },
+];
 
-export async function getShelterStatus(shelterName: string): Promise<ShelterStatus> {
+export async function getShelterStatus(shelterName: string | null = null): Promise<ShelterStatus> {
   return {
     shelterName,
     openStatus: "unknown",
     congestion: undefined,
     fetchedAt: null,
-    source: OSAKA_BOUSAI_NET_SHELTER_SEARCH_SOURCE,
+    sources: SHELTER_STATUS_SOURCES,
     note: "避難所の開設・混雑状況の自動取得は未対応です。最新の状況は公式サイトでご確認ください。",
   };
 }
