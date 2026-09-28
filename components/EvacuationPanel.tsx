@@ -5,6 +5,7 @@ import {
   findFloodShelterCandidates,
   type FloodShelterCandidate,
 } from "@/lib/floodShelterCandidates";
+import type { CapabilityStatus } from "@/lib/region/capability";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import {
   evaluateRouteFloodHazard,
@@ -75,11 +76,16 @@ const VIEW_TITLE: Record<View, string> = {
 
 export default function EvacuationPanel({
   position,
+  shelterAvailability,
   onClose,
   onRoutesChange,
   onStartNavigation,
 }: {
   position: LatLng;
+  /** 地域判定基盤（Phase 2）: 現在地の避難所データ対応状況（lib/region/capability.ts参照）。
+   *  "supported"以外（大阪市以外の地域等）では、大阪市の避難所データを誤って
+   *  流用せず、「準備中」であることを案内する（データ取得自体を行わない）。 */
+  shelterAvailability: CapabilityStatus;
   onClose: () => void;
   /** ルート一覧が変化するたびに呼ばれる。地図への描画はMapView側で行う。
    *  riskSegmentsは選択中ルートの区間別リスク評価(DEM＋洪水＋内水氾濫)。
@@ -97,9 +103,16 @@ export default function EvacuationPanel({
 }) {
   const [view, setView] = useState<View>("candidates");
 
+  // 地域判定基盤（Phase 2）: 現在地が避難所データ対応地域でない場合（大阪市以外等）。
+  // shelterAvailabilityはpropsであり、このパネルが開いている間に変化しない
+  // 前提のため、stateではなく素の派生値として扱う（不要なeffect/setStateを避ける）。
+  // candidatesError（取得失敗）とは意味が異なるため別のNoticeにする
+  // （「準備中」を「エラー」のように見せない）。
+  const candidatesUnsupported = shelterAvailability !== "supported";
+
   const [candidates, setCandidates] = useState<FloodShelterCandidate[] | null>(null);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
-  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [candidatesLoading, setCandidatesLoading] = useState(!candidatesUnsupported);
 
   const [destination, setDestination] = useState<FloodShelterCandidate | null>(null);
   // ルート取得とハザード評価は別工程のため、ユーザーに「今なにをしているか」が
@@ -136,6 +149,12 @@ export default function EvacuationPanel({
     // candidatesLoadingはuseState(true)で既に初期値trueであり、このeffectは
     // マウント時に一度だけ実行される(依存配列は空)ため、ここで改めて
     // setCandidatesLoading(true)を呼ぶ必要はない(常にno-opだった)。
+    // 地域判定基盤（Phase 2）: この地域の避難所データがまだ無い場合
+    // （大阪市以外等）、大阪市の避難所データ(/data/osaka-shelters.json)を
+    // 誤って取得・表示しない。取得自体を行わない
+    // （candidatesUnsupportedは上でcandidatesLoadingの初期値にも反映済み）。
+    if (candidatesUnsupported) return;
+
     let cancelled = false;
     findFloodShelterCandidates(position).then((result) => {
       if (cancelled) return;
@@ -296,6 +315,13 @@ export default function EvacuationPanel({
               />
               候補を検索しています…
             </p>
+          )}
+          {candidatesUnsupported && (
+            <div className="mt-4">
+              <Notice tone="info" title="この地域の避難所データは現在準備中です">
+                現在の対応地域は大阪市のみです。それ以外の地域では、避難先候補を表示できません。
+              </Notice>
+            </div>
           )}
           {candidatesError && (
             <div className="mt-4">

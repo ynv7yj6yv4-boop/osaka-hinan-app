@@ -1,6 +1,8 @@
 // ハザードマップポータルサイト（国土交通省）のタイル配信レイヤー定義
 // 出典・利用規約: ../data/README.md を参照
 
+import type { PrefectureCode } from "@/lib/region/types";
+
 export type HazardKey = "flood" | "inundation" | "hightide";
 
 export const HAZARD_LABELS: Record<
@@ -17,9 +19,21 @@ export const HAZARD_LABELS: Record<
   volcano: "火山現象",
 };
 
+// 地域判定基盤（Phase 2）: 内水浸水想定区域は都道府県ごとに個別配信されている
+// （lib/region/inlandFloodAvailability.ts参照。都道府県コードが存在する＝
+// その県全域でデータが使えるとは限らない）。以前は大阪府コード"27"を
+// 直書きしていたが、将来他県のタイルも参照できるよう関数化した。
+// 【重要】HAZARD_TILE_URL.inundationの値自体は
+// getInundationTileUrl("27")と完全に同一の文字列であり、既存の動作
+// （地図上に表示されるハザードは引き続き大阪府のもの）は変更していない。
+// 実際に他県のタイルへ切り替える配線は今回のPhaseでは行わない。
+export function getInundationTileUrl(prefectureCode: PrefectureCode): string {
+  return `https://disaportaldata.gsi.go.jp/raster/02_naisui_pref_data/${prefectureCode}/{z}/{x}/{y}.png`;
+}
+
 export const HAZARD_TILE_URL: Record<HazardKey, string> = {
   flood: "https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png",
-  inundation: "https://disaportaldata.gsi.go.jp/raster/02_naisui_pref_data/27/{z}/{x}/{y}.png",
+  inundation: getInundationTileUrl("27"),
   hightide: "https://disaportaldata.gsi.go.jp/raster/03_hightide_l2_shinsuishin_data/{z}/{x}/{y}.png",
 };
 

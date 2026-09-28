@@ -19,7 +19,9 @@ import Notice from "./ui/Notice";
 import { LocationIcon, InfoIcon } from "./ui/icons";
 import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
 import { recordRiskHistoryEntry, type RecordRiskHistoryResult } from "@/lib/riskHistory";
-import { checkOsakaArea, type OsakaAreaCheckResult } from "@/lib/osakaAreaCheck";
+import { checkRegion } from "@/lib/region/checkRegion";
+import { getRegionCapability } from "@/lib/region/capability";
+import type { RegionCheckResult } from "@/lib/region/types";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 import type { RouteRiskSegment } from "@/lib/routeSegmentRisk";
@@ -122,10 +124,13 @@ export default function MapView() {
     destination: FloodShelterCandidate;
     riskSegments?: RouteRiskSegment[] | null;
   } | null>(null);
-  // Phase6.1: 「矩形内＝大阪市内」を意味しない。矩形内(likely_osaka_or_nearby)は
-  // 大阪市かどうか確認できていない状態、矩形外(clearly_outside)は明らかに
-  // 離れている可能性が高い状態。それぞれ別の案内を表示する。
-  const [areaCheck, setAreaCheck] = useState<OsakaAreaCheckResult | null>(null);
+  // 地域判定基盤（Phase 2）: 旧 lib/osakaAreaCheck.ts の大阪市専用・矩形判定を廃止し、
+  // 近畿2府4県の行政区域ポリゴンに対するPoint in Polygon判定（lib/region/）に
+  // 置き換えた。status="supported"は近畿2府4県内と判定できたことのみを意味し、
+  // 各機能（避難所・内水氾濫等）がその地域で実際に使えるかどうかは別
+  // （regionCapability・getRegionCapability()を参照。「地域として近畿内」＝
+  // 「機能が使える」ではない）。
+  const [regionCheck, setRegionCheck] = useState<RegionCheckResult | null>(null);
 
   // 試作3 PART A: 選択した参考避難ルートでのナビゲーション。
   // navigationSessionがnullでない間は「ナビ中」とみなし、通常のRiskCard・
@@ -243,7 +248,7 @@ export default function MapView() {
         const lng = result.coords.longitude;
         setPosition({ lat, lng });
         setIsLocating(false);
-        setAreaCheck(checkOsakaArea(lat, lng));
+        checkRegion(lat, lng).then(setRegionCheck);
 
         // 現在地が取得できたら、続けてその場所の危険度を自動判定する
         setIsAssessingRisk(true);
@@ -485,11 +490,43 @@ export default function MapView() {
             </div>
           )}
 
-          {position && areaCheck === "clearly_outside" && (
+          {/* 地域判定基盤（Phase 2）: regionCheck.statusごとの案内。
+              「判定不能(unknown/error)」と「近畿外(outside)」を混同しないよう、
+              それぞれ別の文言・トーンで表示する（判定不能を近畿外と誤認しない）。 */}
+          {position && regionCheck?.status === "outside" && (
             <div className="pointer-events-auto">
-              <Notice tone="warning" title="現在地は大阪市エリアから離れている可能性があります">
-                本アプリは大阪市を対象としており、表示される情報は実際と異なる場合があります。
+              <Notice tone="warning" title="現在地は本アプリの対応地域外の可能性があります">
+                本アプリは近畿2府4県（滋賀・京都・大阪・兵庫・奈良・和歌山）を対象としており、表示される情報は実際と異なる場合があります。
               </Notice>
+            </div>
+          )}
+
+          {position && (regionCheck?.status === "unknown" || regionCheck?.status === "error") && (
+            <div className="pointer-events-auto">
+              <Notice tone="info" title="現在地の地域を判定できませんでした">
+                都道府県境付近にいるか、通信環境により判定できませんでした。表示される情報が実際の地域と異なる場合があります。
+              </Notice>
+            </div>
+          )}
+
+          {/* 現在地の対応地域を小さく表示する。近畿2府4県内であることが判定
+              できても、その地域で各機能が実際に使えるとは限らないため
+              （lib/region/capability.ts参照）、対応が限定的な地域では
+              その旨も併記する（「近畿全域対応が完了した」という誤解を
+              避けるため）。 */}
+          {position && regionCheck?.status === "supported" && (
+            <div className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 px-3 py-1.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)]">
+              現在地：{regionCheck.region.prefectureName}
+              {regionCheck.region.municipalityName ?? ""}
+              {(() => {
+                const capability = getRegionCapability(regionCheck.region);
+                const hasLimitedCapability = Object.values(capability).some((s) => s !== "supported");
+                return hasLimitedCapability ? (
+                  <span className="mt-0.5 block text-[var(--color-text-muted)]">
+                    ※この地域の一部機能は現在準備中です
+                  </span>
+                ) : null;
+              })()}
             </div>
           )}
 
@@ -612,6 +649,13 @@ export default function MapView() {
       {showEvacuationPanel && position && (
         <EvacuationPanel
           position={position}
+          shelterAvailability={
+            regionCheck?.status === "supported"
+              ? getRegionCapability(regionCheck.region).shelter
+              : regionCheck?.status === "outside"
+                ? "unsupported"
+                : "unknown"
+          }
           onClose={() => setShowEvacuationPanel(false)}
           onRoutesChange={setEvacuationRoutes}
           onStartNavigation={handleStartNavigation}

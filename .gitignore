@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 地域境界データのビルド用一時ダウンロード（国土数値情報N03、約29MB）。
+# scripts/build-region-boundaries.mjs が実行のたびに再取得するため、
+# 最終成果物(data/region-boundaries/*.geojson)のみをコミット対象とする。
+data/raw/n03-source/
