@@ -10,7 +10,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { selectFloodCandidates, CANDIDATE_POOL_SIZE } from "./floodShelterCandidates.ts";
+import { selectFloodCandidates, toRouteDestination, CANDIDATE_POOL_SIZE } from "./floodShelterCandidates.ts";
 import type { Shelter } from "./shelter/types.ts";
 
 function makeShelter(overrides: Partial<Shelter>): Shelter {
@@ -141,4 +141,31 @@ test("候補が0件の場合は空配列を返す（例外にしない）", () =
   const shelters: Shelter[] = [makeShelter({ id: "a", supportedDisasters: { flood: false } })];
   const candidates = selectFloodCandidates(shelters, ORIGIN);
   assert.deepEqual(candidates, []);
+});
+
+// ---- 地図上の避難所の吹き出しから直接ルートを開く場合の行き先変換 ----
+
+test("toRouteDestination: 洪水対応の指定緊急避難場所はfloodDesignated=trueで、候補一覧と同じ形になる", () => {
+  const s = makeShelter({ id: "flood-site", lat: 34.701, lng: 135.5 });
+  const d = toRouteDestination(s, ORIGIN);
+  assert.equal(d.floodDesignated, true);
+  assert.equal(d.type, "evacuation_site");
+  assert.equal(d.prefectureName, "大阪府");
+  assert.ok(Math.abs(d.straightLineDistanceMeters - 111) < 2);
+  assert.deepEqual(selectFloodCandidates([s], ORIGIN)[0], d);
+});
+
+test("toRouteDestination: 洪水時の指定が無い避難場所・指定避難所はfloodDesignated=false（ルート画面で注意表示）", () => {
+  assert.equal(toRouteDestination(makeShelter({ supportedDisasters: { flood: false }, hazards: ["earthquake"] }), ORIGIN).floodDesignated, false);
+  const shelter = toRouteDestination(makeShelter({ shelterType: "designated_shelter", supportedDisasters: { flood: "unknown" }, hazards: [] }), ORIGIN);
+  assert.equal(shelter.floodDesignated, false);
+  assert.equal(shelter.type, "shelter");
+});
+
+test("候補一覧（selectFloodCandidates）の候補は、すべてfloodDesignated=true", () => {
+  const candidates = selectFloodCandidates(
+    [makeShelter({ id: "a" }), makeShelter({ id: "b", supportedDisasters: { flood: false } })],
+    ORIGIN
+  );
+  assert.ok(candidates.length > 0 && candidates.every((c) => c.floodDesignated));
 });

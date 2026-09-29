@@ -23,6 +23,8 @@ type ShelterFeature = {
   hazards: HazardKey[];
   telephone?: string | null;
   availableHours?: string | null;
+  /** 吹き出しからルート画面を開くときに渡す元データ。 */
+  shelter: Shelter;
 };
 
 function toShelterFeature(s: Shelter): ShelterFeature {
@@ -36,6 +38,7 @@ function toShelterFeature(s: Shelter): ShelterFeature {
     hazards: s.hazards as HazardKey[],
     telephone: s.telephone,
     availableHours: s.availableHours,
+    shelter: s,
   };
 }
 
@@ -59,6 +62,18 @@ function makeIcon(kind: "shelter" | "safe" | "other") {
   });
 }
 
+/**
+ * 吹き出しを開くときに地図を自動で動かす際の余白。地図の上に重ねている
+ * カード（縦向きは上部のヘッダー・リスク表示・下部のボタン、横向きは左側の列）の
+ * 裏に吹き出しが隠れないようにする。CandidateMarkers.tsxでも使う。
+ */
+export function getPopupAutoPanPadding(): { topLeft: [number, number]; bottomRight: [number, number] } {
+  const landscape = typeof window !== "undefined" && window.matchMedia("(orientation: landscape)").matches;
+  return landscape
+    ? { topLeft: [360, 16], bottomRight: [72, 16] }
+    : { topLeft: [16, 240], bottomRight: [16, 140] };
+}
+
 function hazardLabelText(hazards: HazardKey[]): string {
   const labels = toHazardLabels(hazards);
   if (labels.length === 0) return "災害種別の指定なし";
@@ -68,8 +83,12 @@ function hazardLabelText(hazards: HazardKey[]): string {
 export default function ShelterLayer({
   activeHazard,
   region,
+  onRequestRoute,
 }: {
   activeHazard: HazardKey | null;
+  /** 吹き出しの「この避難所へのルートを見る」を押したとき。ルート画面を開く処理は
+   *  MapView側で行う（このレイヤーはルート取得のロジックを持たない）。 */
+  onRequestRoute: (shelter: Shelter) => void;
   /** Phase 3（地域拡張）: 現在地の地域（lib/region/checkRegion.ts参照）。
    *  Phase 6 PART B: 府県境付近でも、この常時表示レイヤーは現在府県のデータだけを
    *  描画する（隣接府県の候補はCandidateMarkers.tsxが個別に描画する）。
@@ -85,6 +104,12 @@ export default function ShelterLayer({
   // 実際に描画するのは下記effectiveFeatures（region===nullなら常にnull）。
   const [fetchedFeatures, setFetchedFeatures] = useState<ShelterFeature[] | null>(null);
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  // マーカーは大量にあるため、コールバックが変わるたびにマーカーを作り直さないよう、
+  // 最新のコールバックはrefで参照する。
+  const onRequestRouteRef = useRef(onRequestRoute);
+  useEffect(() => {
+    onRequestRouteRef.current = onRequestRoute;
+  }, [onRequestRoute]);
 
   useEffect(() => {
     if (!region) return; // 未対応地域では取得しない（既存のfetchedFeaturesはそのままでよい。描画側で除外する）
@@ -104,6 +129,7 @@ export default function ShelterLayer({
     if (!features) return;
 
     const group = L.markerClusterGroup({ maxClusterRadius: 60 });
+    const popupPadding = getPopupAutoPanPadding();
 
     for (const f of features) {
       const isMatch = activeHazard !== null && f.hazards.includes(activeHazard);
@@ -123,8 +149,25 @@ export default function ShelterLayer({
           ${f.type === "evacuation_site" ? `対応災害：${hazardLabelText(f.hazards)}<br/>` : ""}
           ${telephoneLine}
           ${availableHoursLine}
-        </div>`
+          <button type="button" data-route-button style="margin-top:8px;width:100%;min-height:44px;border:0;border-radius:10px;background:var(--color-primary);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">
+            この避難所へのルートを見る
+          </button>
+        </div>`,
+        {
+          autoPanPaddingTopLeft: popupPadding.topLeft,
+          autoPanPaddingBottomRight: popupPadding.bottomRight,
+        }
       );
+      // 吹き出しはLeafletがHTML文字列から生成するため、開かれたときにボタンへ
+      // クリック処理を付ける（吹き出しを閉じてからルート画面を開く）。
+      marker.on("popupopen", (e: L.PopupEvent) => {
+        const button = e.popup.getElement()?.querySelector<HTMLButtonElement>("[data-route-button]");
+        if (!button) return;
+        button.onclick = () => {
+          map.closePopup();
+          onRequestRouteRef.current(f.shelter);
+        };
+      });
       group.addLayer(marker);
     }
 

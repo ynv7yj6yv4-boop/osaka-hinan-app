@@ -29,7 +29,8 @@ import { getShelterSearchScope } from "@/lib/shelter/crossPrefectureSearch";
 import { getShelterDataCompleteness, summarizeShelterDataCompleteness } from "@/lib/shelter/dataCompleteness";
 import { APP_NAME, APP_TARGET_AREA_LABEL, APP_TARGET_PREFECTURES_TEXT } from "@/lib/appInfo";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
-import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
+import { toRouteDestination, type FloodShelterCandidate } from "@/lib/floodShelterCandidates";
+import type { Shelter } from "@/lib/shelter/types";
 import type { RouteRiskSegment } from "@/lib/routeSegmentRisk";
 import { ROUTE_RISK_LEVEL_PRESENTATION } from "./routeRiskPresentation";
 import type { NavigationDisplayState } from "@/lib/navigation";
@@ -145,6 +146,18 @@ export default function MapView() {
   // Phase 6 PART B: 避難先候補パネルで選ばれた候補。現在府県の避難所レイヤー
   // （ShelterLayer）に含まれない隣接府県の候補だけを、地図上に別途表示する。
   const [shelterCandidates, setShelterCandidates] = useState<FloodShelterCandidate[]>([]);
+  // 地図上の避難所マーカーの吹き出しから「ルートを見る」を押したときの行き先。
+  // nullのときは、避難先パネルを通常どおり候補一覧から開く。
+  const [routeRequest, setRouteRequest] = useState<FloodShelterCandidate | null>(null);
+
+  const openRouteTo = (destination: FloodShelterCandidate) => {
+    setRouteRequest(destination);
+    setShowEvacuationPanel(true);
+  };
+  const handleShelterRouteRequest = (shelter: Shelter) => {
+    if (!position) return;
+    openRouteTo(toRouteDestination(shelter, position));
+  };
 
   // 試作3 PART A: 選択した参考避難ルートでのナビゲーション。
   // navigationSessionがnullでない間は「ナビ中」とみなし、通常のRiskCard・
@@ -347,8 +360,8 @@ export default function MapView() {
           />
         )}
 
-        <ShelterLayer activeHazard={activeHazard} region={currentRegion} />
-        <CandidateMarkers candidates={markersOutsideShelterLayer} />
+        <ShelterLayer activeHazard={activeHazard} region={currentRegion} onRequestRoute={handleShelterRouteRequest} />
+        <CandidateMarkers candidates={markersOutsideShelterLayer} onRequestRoute={openRouteTo} />
 
         {/* ナビ中はNavTrackerが専用の追跡マーカーを描画するため、
             一発取得の現在地マーカーとの重複表示を避ける。 */}
@@ -665,7 +678,10 @@ export default function MapView() {
           {position && (
             <div className="pointer-events-auto">
               <Button
-                onClick={() => setShowEvacuationPanel(true)}
+                onClick={() => {
+                  setRouteRequest(null);
+                  setShowEvacuationPanel(true);
+                }}
                 variant="primary"
                 fullWidth
                 size="lg"
@@ -685,11 +701,17 @@ export default function MapView() {
 
       {showEvacuationPanel && position && (
         <EvacuationPanel
+          // 行き先が変わるたびに作り直し、前回のルート取得状態を引き継がない
+          key={routeRequest?.id ?? "candidates"}
+          initialDestination={routeRequest}
           position={position}
           searchScope={shelterSearchScope}
           shelterDataCompleteness={shelterDataCompleteness}
           onCandidatesChange={setShelterCandidates}
-          onClose={() => setShowEvacuationPanel(false)}
+          onClose={() => {
+            setShowEvacuationPanel(false);
+            setRouteRequest(null);
+          }}
           onRoutesChange={setEvacuationRoutes}
           onStartNavigation={handleStartNavigation}
         />

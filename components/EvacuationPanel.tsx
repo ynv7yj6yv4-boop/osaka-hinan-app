@@ -90,8 +90,13 @@ export default function EvacuationPanel({
   onClose,
   onRoutesChange,
   onStartNavigation,
+  initialDestination = null,
 }: {
   position: LatLng;
+  /** 地図上の避難所マーカーの吹き出しから開いた場合の行き先。指定されていれば、
+   *  候補一覧ではなく、その避難所へのルート比較画面から表示する（戻るボタンで
+   *  候補一覧も見られる）。 */
+  initialDestination?: FloodShelterCandidate | null;
   /** Phase 6 PART B: 避難先候補の検索対象府県（lib/shelter/crossPrefectureSearch.ts）。
    *  nullの場合（近畿外・地域を判定できない等）は、避難所データを誤って流用せず、
    *  「準備中」であることを案内する（データ取得自体を行わない）。 */
@@ -115,7 +120,7 @@ export default function EvacuationPanel({
   /** 試作3 PART A-1: 選択中のルートでナビを開始する（MapView側で画面を切り替える）。 */
   onStartNavigation: (route: WalkingRoute, destination: FloodShelterCandidate) => void;
 }) {
-  const [view, setView] = useState<View>("candidates");
+  const [view, setView] = useState<View>(initialDestination ? "routes" : "candidates");
 
   // 地域判定基盤（Phase 2/3）: 現在地が避難所データ対応地域でない場合（近畿外等）。
   // searchScopeはpropsであり、このパネルが開いている間に変化しない
@@ -130,15 +135,15 @@ export default function EvacuationPanel({
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
   const [candidatesLoading, setCandidatesLoading] = useState(!candidatesUnsupported);
 
-  const [destination, setDestination] = useState<FloodShelterCandidate | null>(null);
+  const [destination, setDestination] = useState<FloodShelterCandidate | null>(initialDestination);
   // ルート取得とハザード評価は別工程のため、ユーザーに「今なにをしているか」が
   // 伝わるよう、ローディング状態を分けて管理する。
-  const [routingLoading, setRoutingLoading] = useState(false);
+  const [routingLoading, setRoutingLoading] = useState(initialDestination !== null);
   const [hazardEvalLoading, setHazardEvalLoading] = useState(false);
   const [routesError, setRoutesError] = useState<string | null>(null);
   const [routeResults, setRouteResults] = useState<RouteWithEvaluation[] | null>(null);
   // 同じ避難先への重複リクエストを防ぐ（連打・再選択時の二重取得を避ける）
-  const [requestedDestinationId, setRequestedDestinationId] = useState<string | null>(null);
+  const [requestedDestinationId, setRequestedDestinationId] = useState<string | null>(initialDestination?.id ?? null);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [routeLog, setRouteLog] = useState<RouteJudgmentLog | null>(null);
@@ -229,6 +234,11 @@ export default function EvacuationPanel({
     setSegmentRiskLoading(false);
     setExpandedSegmentIndex(null);
 
+    await loadRoutes(candidate);
+  };
+
+  /** 行き先までの徒歩ルートを取得し、各ルートの洪水ハザードを評価する。 */
+  const loadRoutes = async (candidate: FloodShelterCandidate) => {
     const fetchResult = await fetchWalkingRoutes(position, {
       lat: candidate.lat,
       lng: candidate.lng,
@@ -252,6 +262,14 @@ export default function EvacuationPanel({
     setSelectedIndex(0);
     setHazardEvalLoading(false);
   };
+
+  // 地図上の避難所の吹き出しから開いた場合は、その避難所へのルート取得から始める
+  // （ルート比較・洪水ハザード評価を経てから案内を開始する、既存の流れを使う）。
+  // 画面・行き先・読み込み中の状態は、useStateの初期値としてすでに設定している。
+  useEffect(() => {
+    if (initialDestination) void loadRoutes(initialDestination);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClose = () => {
     // パネルを閉じても、既に取得済みのルートは地図上に表示したままにする
@@ -434,6 +452,15 @@ export default function EvacuationPanel({
 
       {view === "routes" && (
         <div>
+          {/* 地図上の避難所から直接開いた場合、洪水時の指定が無い避難所もありうる。
+              ルート自体は表示するが、洪水時の避難先として適切とは限らないことを先に伝える。 */}
+          {destination && !destination.floodDesignated && (
+            <div className="mb-3">
+              <Notice tone="warning" title="洪水時の避難先としては指定されていません">
+                {destination.name}は、自治体が洪水時の指定緊急避難場所として指定している施設ではありません。洪水からの避難には、「近くの洪水対応避難先」の候補もあわせてご確認ください。
+              </Notice>
+            </div>
+          )}
           {routingLoading && (
             <p className="flex items-center gap-2 text-[var(--color-text-secondary)]">
               <span
@@ -625,7 +652,7 @@ export default function EvacuationPanel({
           <section className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3">
             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">データについて</h3>
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
-              自治体の洪水対応指定：あり（国土地理院データ）
+              自治体の洪水対応指定：{destination?.floodDesignated === false ? "なし" : "あり"}（国土地理院データ）
               <br />
               使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域）
               <br />

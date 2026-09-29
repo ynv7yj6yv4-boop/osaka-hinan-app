@@ -67,6 +67,11 @@ export type FloodShelterCandidate = {
    *  「奈良県 生駒市」のような所在地を表示する。元データに無ければnull。 */
   prefectureName: string | null;
   municipalityName: string | null;
+  /** 自治体が洪水時の指定緊急避難場所として指定しているか。避難先候補一覧
+   *  （selectFloodCandidates）から選んだものは常にtrue。地図上の避難所マーカーから
+   *  直接ルートを開いた場合は、洪水時の指定が無い避難所もありうるため、
+   *  ルート画面でその旨を注意表示するのに使う。 */
+  floodDesignated: boolean;
 };
 
 // 候補として表示する件数。卒論の検証等で変更しやすいよう定数化している。
@@ -129,6 +134,32 @@ export type FloodCandidateResult =
  * false（明示的に非該当）・"unknown"（指定避難所等、判定材料が無い）は
  * いずれも候補にしない（trueのみを候補とすることで、この3状態を混同しない）。
  */
+/**
+ * 避難所1件を、ルート画面（EvacuationPanel.tsx）で使う行き先の形に変換する。
+ * 避難先候補一覧からだけでなく、地図上の避難所マーカーの吹き出しから直接
+ * ルートを開く場合にも使う（その場合は洪水時の指定が無い避難所もありうる）。
+ */
+export function toRouteDestination(s: Shelter, position: { lat: number; lng: number }): FloodShelterCandidate {
+  return {
+    id: s.id,
+    name: s.name,
+    address: s.address ?? "",
+    lat: s.lat,
+    lng: s.lng,
+    straightLineDistanceMeters: haversineDistanceMeters(position, s),
+    type: s.shelterType === "designated_shelter" ? "shelter" : "evacuation_site",
+    hazards: s.hazards,
+    telephone: s.telephone ?? null,
+    availableHours: s.availableHours ?? null,
+    ward: s.ward ?? null,
+    category: s.category ?? null,
+    prefectureCode: s.prefectureCode,
+    prefectureName: s.prefectureName ?? null,
+    municipalityName: s.municipalityName ?? null,
+    floodDesignated: s.shelterType === "designated_emergency_evacuation_site" && s.supportedDisasters.flood === true,
+  };
+}
+
 export function selectFloodCandidates(
   shelters: Shelter[],
   position: { lat: number; lng: number },
@@ -138,23 +169,7 @@ export function selectFloodCandidates(
     (s) => s.shelterType === "designated_emergency_evacuation_site" && s.supportedDisasters.flood === true
   );
 
-  const withDistance: FloodShelterCandidate[] = floodSites.map((s) => ({
-    id: s.id,
-    name: s.name,
-    address: s.address ?? "",
-    lat: s.lat,
-    lng: s.lng,
-    straightLineDistanceMeters: haversineDistanceMeters(position, s),
-    type: "evacuation_site",
-    hazards: s.hazards,
-    telephone: s.telephone ?? null,
-    availableHours: s.availableHours ?? null,
-    ward: s.ward ?? null,
-    category: s.category ?? null,
-    prefectureCode: s.prefectureCode,
-    prefectureName: s.prefectureName ?? null,
-    municipalityName: s.municipalityName ?? null,
-  }));
+  const withDistance: FloodShelterCandidate[] = floodSites.map((s) => toRouteDestination(s, position));
 
   withDistance.sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters);
 
