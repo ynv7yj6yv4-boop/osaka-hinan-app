@@ -76,4 +76,12 @@ export type Shelter = {
   availableHours?: string | null;
   ward?: string | null;
   category?: string | null;
+
+  /** Phase 6: 保守的な重複名寄せ（lib/shelter/deduplicateShelters.ts）で
+   *  複数レコードを1件に統合した場合のみ、統合元の全共通ID（このレコード
+   *  自身のidを含む）を保持する。統合されていないレコードには付与しない
+   *  （undefinedのまま）。研究上「どの元レコードを統合したか」を後から
+   *  追跡できるようにするためのフィールドであり、Shelter型の他フィールドの
+   *  意味は変えない。 */
+  mergedFrom?: string[];
 };

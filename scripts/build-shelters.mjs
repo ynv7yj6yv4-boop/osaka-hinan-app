@@ -53,6 +53,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { matchShelterEnrichment } from "../lib/shelterEnrichmentMatching.ts";
 import { PREFECTURE_SLUGS } from "../lib/region/types.ts";
+import { deduplicateShelters } from "../lib/shelter/deduplicateShelters.ts";
+import { OFFICIALLY_NOT_PROVIDED } from "../lib/shelter/officialShelterDataGaps.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rawDir = path.join(__dirname, "..", "data", "raw");
@@ -184,6 +186,9 @@ const HAZARD_COLUMNS = {
 
 const allFeatures = [];
 const missingFiles = [];
+// Phase 6 PART D: 市町村ごとに、公式CSV（指定緊急避難場所／指定避難所）を
+// 実際に読み込めたかどうか（lib/shelter/dataCompleteness.ts参照）。
+const datasetPresence = {};
 let missingLatLngCount = 0;
 
 for (const { code, name: municipalityName } of targetMunicipalities) {
@@ -195,6 +200,7 @@ for (const { code, name: municipalityName } of targetMunicipalities) {
 
   if (!kinkyuRows) missingFiles.push(kinkyuPath);
   if (!hinanjoRows) missingFiles.push(hinanjoPath);
+  datasetPresence[code] = { emergencyEvacuationSites: Boolean(kinkyuRows), designatedShelters: Boolean(hinanjoRows) };
 
   missingLatLngCount += (kinkyuRows ?? []).filter((row) => !row["緯度"] || !row["経度"]).length;
   missingLatLngCount += (hinanjoRows ?? []).filter((row) => !row["緯度"] || !row["経度"]).length;
@@ -342,6 +348,28 @@ if (PREFECTURE_CODE === "27") {
 }
 
 // ============================================================
+// 保守的な重複名寄せ（Phase 6 PART A。lib/shelter/deduplicateShelters.ts参照）
+// ============================================================
+
+const beforeDedupCount = featuresWithEnrichment.length;
+const dedupResult = deduplicateShelters(featuresWithEnrichment);
+featuresWithEnrichment = dedupResult.shelters;
+
+console.log("\n[build-shelters] 重複名寄せ（保守的）");
+console.log(`  名寄せ前総件数: ${beforeDedupCount}`);
+console.log(`  名寄せ後総件数: ${featuresWithEnrichment.length}`);
+console.log(`  自動統合したクラスタ数: ${dedupResult.mergedClusterCount}`);
+console.log(`  統合により削減されたレコード数: ${dedupResult.mergedRecordCount}`);
+console.log(`  自動統合しなかった近接同名ペア（要確認）: ${dedupResult.flaggedPairs.length}`);
+if (dedupResult.flaggedPairs.length > 0) {
+  for (const p of dedupResult.flaggedPairs) {
+    console.log(
+      `    - ${p.name}（${p.municipalityCode}, ${p.shelterType}）: ${p.id1} <-> ${p.id2}, 距離${p.distanceMeters.toFixed(1)}m, 理由:${p.reason}`
+    );
+  }
+}
+
+// ============================================================
 // データ品質チェック
 // ============================================================
 
@@ -378,6 +406,14 @@ console.log(`  住所欠損: ${missingAddress}`);
 console.log(`  市町村コード欠損: ${missingMunicipalityCode}`);
 console.log(`  重複除去件数（同一共通IDが複数ファイルに存在）: ${duplicateCount}`);
 
+const mergedFloodCandidateClusters = featuresWithEnrichment.filter(
+  (f) =>
+    (f.mergedFrom?.length ?? 0) > 1 &&
+    f.shelterType === "designated_emergency_evacuation_site" &&
+    f.supportedDisasters.flood === true
+).length;
+console.log(`  重複名寄せ: 洪水対応候補(flood=true)の統合クラスタ数: ${mergedFloodCandidateClusters}`);
+
 // ============================================================
 // JSON出力
 // ============================================================
@@ -393,6 +429,46 @@ const output = {
 };
 
 writeFileSync(outPath, JSON.stringify(output), "utf-8");
+
+// ============================================================
+// 市町村別の公式データ提供状況（Phase 6 PART D）
+// ============================================================
+// UI（lib/shelter/dataCompleteness.ts）がクライアント側で参照できるよう、
+// 市町村ごとの「CSVを読み込めたか」だけを小さなTSファイルとして書き出す。
+// CSVが無い市町村のうち、国土地理院が公式に「提供していない」と明記している
+// もの（OFFICIALLY_NOT_PROVIDED）以外は、取得漏れの可能性として警告する
+// （アプリ側でもその場合は"unavailable"ではなく"unknown"として扱う）。
+const presenceConstName = `${slug.toUpperCase()}_SHELTER_DATASET_PRESENCE`;
+const presenceOutPath = path.join(__dirname, "..", "lib", "shelter", "shelterDatasetPresence", `${slug}.generated.ts`);
+const presenceLines = [
+  "// このファイルは scripts/build-shelters.mjs が自動生成する（手で編集しないこと）。",
+  `// ${PREFECTURE_NAME}の市町村ごとに、国土地理院の公式CSVをビルド時に読み込めたかどうか。`,
+  "// 解釈（available/unavailable/unknown）は lib/shelter/dataCompleteness.ts を参照。",
+  "",
+  'import type { ShelterDatasetPresence } from "../dataCompleteness.ts";',
+  "",
+  `export const ${presenceConstName}: Record<string, ShelterDatasetPresence> = {`,
+  ...Object.entries(datasetPresence).map(
+    ([code, p]) =>
+      `  "${code}": { emergencyEvacuationSites: ${p.emergencyEvacuationSites}, designatedShelters: ${p.designatedShelters} },`
+  ),
+  "};",
+  "",
+];
+writeFileSync(presenceOutPath, presenceLines.join("\n"), "utf-8");
+
+const partialMunicipalities = Object.entries(datasetPresence).filter(
+  ([, p]) => !p.emergencyEvacuationSites || !p.designatedShelters
+);
+console.log(`\n[build-shelters] 市町村別の公式データ提供状況 -> ${presenceOutPath}`);
+console.log(`  両CSVあり: ${Object.keys(datasetPresence).length - partialMunicipalities.length}市町村 / 片方以上なし: ${partialMunicipalities.length}市町村`);
+for (const [code, p] of partialMunicipalities) {
+  const missingKeys = Object.entries(p).filter(([, ok]) => !ok).map(([k]) => k);
+  const official = missingKeys.every((k) => (OFFICIALLY_NOT_PROVIDED[code] ?? []).includes(k));
+  console.log(
+    `  - ${code}: ${missingKeys.join(",")}なし（${official ? "公式に未提供と確認済み" : "【警告】公式な未提供記録が無い。取得漏れの可能性"}）`
+  );
+}
 
 console.log(
   `\n書き出し完了: ${output.features.length}件 (指定緊急避難場所 ${kinkyuCount} / 指定避難所 ${hinanjoCount}) -> ${outPath}`

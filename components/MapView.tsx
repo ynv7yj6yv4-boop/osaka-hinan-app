@@ -5,13 +5,8 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
-import {
-  HAZARD_BUTTONS,
-  HAZARD_TILE_URL,
-  HAZARD_ATTRIBUTION,
-  getInundationTileUrl,
-  type HazardKey,
-} from "./hazardLayers";
+import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
+import CandidateMarkers from "./CandidateMarkers";
 import RiskCard from "./RiskCard";
 import DisasterInfoCard from "./DisasterInfoCard";
 import RiskDetailModal from "./RiskDetailModal";
@@ -28,6 +23,10 @@ import { recordRiskHistoryEntry, type RecordRiskHistoryResult } from "@/lib/risk
 import { checkRegion } from "@/lib/region/checkRegion";
 import { getRegionCapability } from "@/lib/region/capability";
 import type { RegionCheckResult, Region } from "@/lib/region/types";
+import { KINKI_BOUNDS } from "@/lib/region/kinkiBounds.generated";
+import { getShelterSearchScope } from "@/lib/shelter/crossPrefectureSearch";
+import { getShelterDataCompleteness, summarizeShelterDataCompleteness } from "@/lib/shelter/dataCompleteness";
+import { APP_NAME, APP_TARGET_AREA_LABEL, APP_TARGET_PREFECTURES_TEXT } from "@/lib/appInfo";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 import type { RouteRiskSegment } from "@/lib/routeSegmentRisk";
@@ -51,38 +50,19 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41],
 });
 
-// 大阪市役所付近を初期表示の中心地点とする
-const OSAKA_CITY_CENTER: [number, number] = [34.6937, 135.5023];
-const DEFAULT_ZOOM = 13;
+// Phase 6 PART C: 位置情報取得前の初期表示は、大阪市役所の固定座標ではなく、
+// 行政区域データから算出した近畿2府4県全体の外接矩形に合わせる
+// （scripts/build-kinki-bounds.mjsが生成。位置情報取得後は従来どおり現在地へ移動）。
+const INITIAL_BOUNDS = KINKI_BOUNDS;
 
 // 試作2（要件定義書2 §5・§32）: 高潮を研究対象から除外したため、
 // ハザード切替UIの選択肢からは高潮を外す。
-// 内水氾濫についても、地図上のハザード表示切替（地図に重ねて表示する
-// レイヤー選択）からは選択肢を外す（ユーザー指示）。
-// 【重要】これは地図上に内水氾濫タイルを「重ねて表示する」機能だけの制限。
-// lib/riskAssessment.ts の危険度判定・lib/routeSegmentRisk.ts の
-// ルート区間評価では、内水氾濫データが確認できる地域で内水氾濫を引き続き
-// 評価する（下記getInundationTileUrlForRegion参照。2026-09-30の方針・訂正版）。
+// 内水氾濫も、Phase 6でアプリ全体の対象外とした（lib/region/capability.tsの
+// INLAND_FLOOD_EVALUATION_ENABLED参照）ため、地図表示・危険度判定・
+// ルート評価のいずれでも使わない（このアプリは洪水対応アプリとして扱う）。
 const DISPLAYABLE_HAZARD_BUTTONS = HAZARD_BUTTONS.filter(
   (h) => h.key !== "hightide" && h.key !== "inundation"
 );
-
-/**
- * 危険度判定・ルート評価で内水氾濫を評価してよいか、してよいならどの
- * タイルURLを使うかを、地域判定結果から一箇所で決める。
- * - 地域が判定できていない(supported以外)場合はnull（内水氾濫を評価しない）
- * - 判定できた都道府県で、内水氾濫データが"unsupported"（確認できない）
- *   場合もnull
- * - それ以外（"supported"・"unknown"）の場合は、該当都道府県のタイルURLを返す
- *   （"unknown"は「データが無いと確定していない」ため、評価を試みる側にする。
- *   実際にデータが無ければ、classifyHazardPixel側で自然にunknownになる）。
- */
-function getInundationTileUrlForRegion(regionCheck: RegionCheckResult | null): string | null {
-  if (!regionCheck || regionCheck.status !== "supported") return null;
-  const availability = getRegionCapability(regionCheck.region).inlandFlood;
-  if (availability === "unsupported") return null;
-  return getInundationTileUrl(regionCheck.region.prefectureCode);
-}
 
 /** Phase 3（地域拡張）: regionCheckから、避難所Provider（lib/shelter/provider.ts）
  *  等が必要とするRegionを取り出す。地域が判定できていない場合はnull。 */
@@ -137,7 +117,7 @@ export default function MapView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [activeHazard, setActiveHazard] = useState<HazardKey | null>(null);
-  // スマートフォンUI改善: 「大阪市対象」の詳しい説明（コンパクトヘッダーの
+  // スマートフォンUI改善: 対象地域の詳しい説明（コンパクトヘッダーの
   // 情報アイコン）の開閉。ハザード切替の開閉は HazardLayerControl 側の
   // 内部stateに移した（判定ロジック・選択肢は変更していない）。
   const [showAreaInfo, setShowAreaInfo] = useState(false);
@@ -161,6 +141,9 @@ export default function MapView() {
   // （regionCapability・getRegionCapability()を参照。「地域として近畿内」＝
   // 「機能が使える」ではない）。
   const [regionCheck, setRegionCheck] = useState<RegionCheckResult | null>(null);
+  // Phase 6 PART B: 避難先候補パネルで選ばれた候補。現在府県の避難所レイヤー
+  // （ShelterLayer）に含まれない隣接府県の候補だけを、地図上に別途表示する。
+  const [shelterCandidates, setShelterCandidates] = useState<FloodShelterCandidate[]>([]);
 
   // 試作3 PART A: 選択した参考避難ルートでのナビゲーション。
   // navigationSessionがnullでない間は「ナビ中」とみなし、通常のRiskCard・
@@ -279,25 +262,24 @@ export default function MapView() {
         setPosition({ lat, lng });
         setIsLocating(false);
 
-        // 危険度判定は、内水氾濫データが確認できる地域かどうかで評価対象
-        // ハザードが変わるため、地域判定の結果を待ってから実行する
-        // （2026-09-30の方針・訂正版。地域判定自体は軽量なサーバー側
-        // Point in Polygon判定のため、体感できるほどの遅延は生じない想定）。
-        setIsAssessingRisk(true);
-        checkRegion(lat, lng).then((region) => {
-          setRegionCheck(region);
-          const inundationTileUrl = getInundationTileUrlForRegion(region);
+        // 現在地が変わったため、前の地点の避難先候補（地図上の隣接府県候補
+        // マーカー）は消す。
+        setShelterCandidates([]);
+        checkRegion(lat, lng).then(setRegionCheck);
 
-          assessRisk(lat, lng, inundationTileUrl)
-            .then((result) => {
-              setRiskResult(result);
-              // 研究用・UX改善用: 前回確認時との比較をこの端末内(localStorage)だけで
-              // 記録する。サーバーへは送信せず、失敗してもリスク表示自体は壊れない
-              // (lib/riskHistory.ts参照)。
-              setRiskComparison(recordRiskHistoryEntry(result.level, result.generatedAt));
-            })
-            .finally(() => setIsAssessingRisk(false));
-        });
+        // Phase 6: 内水氾濫をアプリ全体の対象外としたため、危険度判定の評価対象
+        // （洪水のみ）は地域に依存しなくなった。地域判定の完了を待たずに並行して
+        // 実行する（内水氾濫タイルへのリクエストも行わない）。
+        setIsAssessingRisk(true);
+        assessRisk(lat, lng)
+          .then((result) => {
+            setRiskResult(result);
+            // 研究用・UX改善用: 前回確認時との比較をこの端末内(localStorage)だけで
+            // 記録する。サーバーへは送信せず、失敗してもリスク表示自体は壊れない
+            // (lib/riskHistory.ts参照)。
+            setRiskComparison(recordRiskHistoryEntry(result.level, result.generatedAt));
+          })
+          .finally(() => setIsAssessingRisk(false));
       },
       (error) => {
         setIsLocating(false);
@@ -327,19 +309,15 @@ export default function MapView() {
     );
   };
 
-  // 洪水以外(内水氾濫)のみでリスクが出ている場合、参考避難ルート機能が
-  // その原因ハザードに対応していないことを案内するためのフラグ。
-  // Phase5Aの洪水専用ルート評価ロジックそのものは変更していない。
-  // 試作2: 高潮はlib/riskAssessment.tsのRiskLevel算出対象から除外したため、
-  // ここでの比較対象も内水氾濫のみとする（riskResult.factorsにも高潮は含まれなくなった）。
-  // 【重要・2026-09-30の方針・訂正版】内水氾濫は、データが確認できない
-  // 地域でのみriskResult.factorsから省かれる（getInundationTileUrlForRegion
-  // 参照）。データが確認できる地域（大阪府等）では引き続き"inundation"
-  // キーが含まれうるため、このフラグは地域によって意味のある判定を行う。
-  const floodFactor = riskResult?.factors.find((f) => f.key === "flood");
-  const inundationScore = riskResult?.factors.find((f) => f.key === "inundation")?.score ?? 0;
-  const floodIsNotThePrimaryHazard = Boolean(
-    riskResult && inundationScore > 0 && (floodFactor?.score ?? 0) === 0
+  // Phase 6 PART B: 避難先候補の検索対象府県（府県境付近では隣接府県も含む）。
+  const shelterSearchScope = getShelterSearchScope(regionCheck);
+  const currentRegion = getRegion(regionCheck);
+  // Phase 6 PART D: 現在地の市区町村の公式避難所データ提供状況。
+  const shelterDataCompleteness = getShelterDataCompleteness(currentRegion?.municipalityCode);
+  // 現在府県の避難所レイヤー（ShelterLayer）に含まれない候補だけを追加表示する
+  // （府県境の判定があいまいでShelterLayer自体を表示しない場合は、すべての候補）。
+  const markersOutsideShelterLayer = shelterCandidates.filter(
+    (c) => c.prefectureCode !== currentRegion?.prefectureCode
   );
 
   // 試作3（要件定義書2 PART I）: 「地図を背景・中心にして、必要情報を重ねる」構成へ変更。
@@ -351,8 +329,7 @@ export default function MapView() {
     <div className="relative h-dvh w-full overflow-hidden bg-zinc-200">
       {/* ==== 背景レイヤー：地図（画面全体） ==== */}
       <MapContainer
-        center={OSAKA_CITY_CENTER}
-        zoom={DEFAULT_ZOOM}
+        bounds={INITIAL_BOUNDS}
         className="absolute inset-0 h-full w-full z-0"
       >
         <TileLayer
@@ -369,7 +346,8 @@ export default function MapView() {
           />
         )}
 
-        <ShelterLayer activeHazard={activeHazard} region={getRegion(regionCheck)} />
+        <ShelterLayer activeHazard={activeHazard} region={currentRegion} />
+        <CandidateMarkers candidates={markersOutsideShelterLayer} />
 
         {/* ナビ中はNavTrackerが専用の追跡マーカーを描画するため、
             一発取得の現在地マーカーとの重複表示を避ける。 */}
@@ -488,20 +466,21 @@ export default function MapView() {
               しまうため、ユーザーとの合意により横向き時のみ非表示にする
               （縦向きの表示は変更なし。免責自体を削除するわけではなく、
               RiskDetailModal等で引き続き確認できる）。
-              スマートフォンUI改善: 「大阪市対象」の案内（従来は position取得後に
-              別カードとして表示していた）を、常時表示のこのヘッダー2行目に統合し、
-              情報アイコンで詳しい注意書きを開閉できるようにした（大阪市限定である
-              ことは常に見える状態を維持しつつ、詳細説明は必要なときだけ表示）。
-              「明らかに大阪市外」の警告(clearly_outside)は安全上より重要なため、
+              スマートフォンUI改善: 対象地域の案内を常時表示のこのヘッダー2行目に
+              統合し、情報アイコンで詳しい注意書きを開閉できるようにした（対象地域は
+              常に見える状態を維持しつつ、詳細説明は必要なときだけ表示）。
+              Phase 6 PART C: 近畿2府4県対応版の名称・対象表示に変更（lib/appInfo.ts）。
+              行数・高さは従来と同じ2行に保ち、地図の表示面積を狭めない。
+              「対応地域外」の警告(outside)は安全上より重要なため、
               統合せず引き続き別のNoticeとして表示する。 */}
           <div className="pointer-events-auto rounded-[var(--radius-md)] bg-[var(--color-surface)]/95 px-3.5 py-2 shadow-[var(--shadow-sm)] [@media(orientation:landscape)]:hidden">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <h1 className="text-sm font-bold leading-tight text-[var(--color-text-primary)]">
-                  大阪市 避難支援マップ
+                  {APP_NAME}
                 </h1>
                 <p className="mt-0.5 text-[11px] leading-snug text-[var(--color-text-muted)]">
-                  参考情報・大阪市対象
+                  参考情報・{APP_TARGET_AREA_LABEL}
                 </p>
               </div>
               <button
@@ -520,7 +499,7 @@ export default function MapView() {
                 id="app-info-detail"
                 className="mt-1.5 border-t border-[var(--color-border)] pt-1.5 text-[11px] leading-snug text-[var(--color-text-muted)]"
               >
-                ※本アプリは参考情報です。公式情報も必ずご確認ください。大阪市を対象としており、市外では情報が不正確な場合があります。
+                ※本アプリは参考情報です。公式情報も必ずご確認ください。対象は近畿2府4県（{APP_TARGET_PREFECTURES_TEXT}）で、災害種別は洪水のみを扱います。対象地域外では情報が不正確な場合があります。
               </p>
             )}
           </div>
@@ -537,7 +516,7 @@ export default function MapView() {
           {position && regionCheck?.status === "outside" && (
             <div className="pointer-events-auto">
               <Notice tone="warning" title="現在地は本アプリの対応地域外の可能性があります">
-                本アプリは近畿2府4県（滋賀・京都・大阪・兵庫・奈良・和歌山）を対象としており、表示される情報は実際と異なる場合があります。
+                本アプリは近畿2府4県（{APP_TARGET_PREFECTURES_TEXT}）を対象としており、表示される情報は実際と異なる場合があります。
               </Notice>
             </div>
           )}
@@ -560,17 +539,28 @@ export default function MapView() {
               現在地：{regionCheck.region.prefectureName}
               {regionCheck.region.municipalityName ?? ""}
               {(() => {
+                // Phase 6: 内水氾濫はアプリ全体の対象外（地域ごとの「準備中」ではない）
+                // ため、「一部機能は準備中」の判定材料から除く。
                 const capability = getRegionCapability(regionCheck.region);
-                // 2026-09-30の方針・訂正版: 内水氾濫はデータが確認できない
-                // 地域でのみ評価を省略するため、「一部機能は準備中」の判定材料
-                // としてinlandFloodも含める（他の項目と同様に扱う）。
-                const hasLimitedCapability = Object.values(capability).some((s) => s !== "supported");
+                const hasLimitedCapability = [
+                  capability.flood,
+                  capability.shelter,
+                  capability.rainfall,
+                  capability.elevation,
+                ].some((s) => s !== "supported");
                 return hasLimitedCapability ? (
                   <span className="mt-0.5 block text-[var(--color-text-muted)]">
                     ※この地域の一部機能は現在準備中です
                   </span>
                 ) : null;
               })()}
+              {/* Phase 6 PART D: 公式データが部分提供の市区町村では、小さな補足だけを出す
+                  （地図を覆う警告カードにはしない）。 */}
+              {summarizeShelterDataCompleteness(shelterDataCompleteness) === "partial" && (
+                <span className="mt-0.5 block text-[var(--color-text-muted)]">
+                  ※この地域では、公式避難所データの一部のみ提供されています
+                </span>
+              )}
             </div>
           )}
 
@@ -645,19 +635,6 @@ export default function MapView() {
             </button>
           </div>
 
-          {/* Phase6.1: 現在の主なリスクが洪水以外(内水氾濫)の場合、
-              この機能が「現在のリスクへの対応」であるかのように見えないよう、
-              ボタンを押す前に注意書きを先に表示し、ボタン自体の見た目も
-              控えめにする（洪水対応機能そのものは非表示にしない）。
-              試作2: 高潮を対象から除外したため、文言も内水氾濫のみに変更。 */}
-          {floodIsNotThePrimaryHazard && (
-            <div className="pointer-events-auto">
-              <Notice tone="warning" title="現在の危険度は主に内水氾濫によるものです">
-                下記の参考避難ルート機能は洪水のみに対応しており、現在の危険度には対応していません。
-              </Notice>
-            </div>
-          )}
-
           {errorMessage && (
             <div className="pointer-events-auto">
               <Notice tone="danger" title="現在地を確認できませんでした">
@@ -673,7 +650,7 @@ export default function MapView() {
             <div className="pointer-events-auto">
               <Button
                 onClick={() => setShowEvacuationPanel(true)}
-                variant={floodIsNotThePrimaryHazard ? "secondary" : "primary"}
+                variant="primary"
                 fullWidth
                 size="lg"
               >
@@ -693,15 +670,9 @@ export default function MapView() {
       {showEvacuationPanel && position && (
         <EvacuationPanel
           position={position}
-          region={getRegion(regionCheck)}
-          shelterAvailability={
-            regionCheck?.status === "supported"
-              ? getRegionCapability(regionCheck.region).shelter
-              : regionCheck?.status === "outside"
-                ? "unsupported"
-                : "unknown"
-          }
-          inundationTileUrl={getInundationTileUrlForRegion(regionCheck)}
+          searchScope={shelterSearchScope}
+          shelterDataCompleteness={shelterDataCompleteness}
+          onCandidatesChange={setShelterCandidates}
           onClose={() => setShowEvacuationPanel(false)}
           onRoutesChange={setEvacuationRoutes}
           onStartNavigation={handleStartNavigation}

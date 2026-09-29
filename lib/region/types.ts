@@ -51,6 +51,13 @@ export type Region = {
   /** 市区町村境界データを保有していない場合はundefined（都道府県までの判定）。 */
   municipalityCode?: MunicipalityCode;
   municipalityName?: string;
+  /** Phase 6 PART B: 現在地からCROSS_PREFECTURE_SEARCH_DISTANCE_METERS以内
+   *  にある、実際に隣接する都道府県のコード一覧（lib/region/
+   *  prefectureAdjacency.ts参照）。空配列は「その距離内に隣接県が無い」
+   *  ことを意味する（府県境から十分離れた地点等）。避難先候補検索
+   *  （lib/shelter/crossPrefectureSearch.ts）が、隣接ProviderのJSONも
+   *  取得すべきかどうかの判断に使う。 */
+  nearbyPrefectureCodes: PrefectureCode[];
 };
 
 /**
@@ -58,7 +65,12 @@ export type Region = {
  * - "supported": 近畿2府4県のいずれかに該当する地点として判定できた（regionを伴う）
  * - "outside": 近畿2府4県のいずれにも該当しないと判定できた（＝「近畿外」。判定不能ではない）
  * - "unknown": 判定できなかった（府県境付近で確信が持てない場合や、境界データの
- *   該当なし等）。「近畿外」と混同してはならない。
+ *   該当なし等）。「近畿外」と混同してはならない。府県境バッファのあいまいさが
+ *   原因の場合は、reason:"boundary_ambiguity"とcandidatePrefectureCodes
+ *   （どの都道府県の可能性があるか）を伴う（Phase 6 PART B）。
+ *   【重要】この情報は「unknownをsupportedへ格上げする」ためのものではない
+ *   （どちらの府県か確定できないという判定そのものは変えない）。あくまで
+ *   「候補となりうる複数府県のShelterデータを検索してよいか」の判断材料。
  * - "error": 判定処理自体が技術的に失敗した（データ読み込み失敗・例外等）。
  */
 export type RegionCheckStatus = "supported" | "outside" | "unknown" | "error";
@@ -66,5 +78,5 @@ export type RegionCheckStatus = "supported" | "outside" | "unknown" | "error";
 export type RegionCheckResult =
   | { status: "supported"; region: Region }
   | { status: "outside" }
-  | { status: "unknown" }
+  | { status: "unknown"; reason?: "boundary_ambiguity"; candidatePrefectureCodes?: PrefectureCode[] }
   | { status: "error"; message: string };

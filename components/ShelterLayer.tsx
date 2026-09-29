@@ -71,10 +71,12 @@ export default function ShelterLayer({
 }: {
   activeHazard: HazardKey | null;
   /** Phase 3（地域拡張）: 現在地の地域（lib/region/checkRegion.ts参照）。
+   *  Phase 6 PART B: 府県境付近でも、この常時表示レイヤーは現在府県のデータだけを
+   *  描画する（隣接府県の候補はCandidateMarkers.tsxが個別に描画する）。
    *  避難所データを提供しているProvider（lib/shelter/provider.ts）が
    *  存在する都道府県の場合のみ取得・表示する。nullの場合
    *  （まだ現在地を取得していない等）も表示しない
-   *  （現在地が不明な状態で大阪府のデータを既定で表示しない）。 */
+   *  （現在地が不明な状態で特定府県のデータを既定で表示しない）。 */
   region: Region | null;
 }) {
   const map = useMap();
@@ -87,7 +89,7 @@ export default function ShelterLayer({
   useEffect(() => {
     if (!region) return; // 未対応地域では取得しない（既存のfetchedFeaturesはそのままでよい。描画側で除外する）
     let cancelled = false;
-    getShelters(region).then((result) => {
+    getShelters(region.prefectureCode).then((result) => {
       if (cancelled) return;
       setFetchedFeatures(result.status === "ok" ? result.shelters.map(toShelterFeature) : null);
     });

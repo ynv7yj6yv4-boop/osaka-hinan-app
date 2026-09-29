@@ -3,7 +3,7 @@
 // lib/shelter/provider.ts（都道府県単位のShelterProvider）経由の
 // 取得へ一般化した。UI層（EvacuationPanel.tsx等）が使う
 // FloodShelterCandidate型・findFloodShelterCandidates()のシグネチャの
-// 意味合いは変えていない（regionを追加の引数として受け取るようになった点のみ変更）。
+// 意味合いは変えていない（検索対象の府県を追加の引数として受け取る点のみ変更）。
 //
 // 【方針（ユーザーとの合意事項）】
 // - 対象災害は洪水のみ。高潮・内水氾濫は別途設計する（内水氾濫は現段階で対象外）。
@@ -21,9 +21,13 @@
 //   コメント参照）。都道府県内の全候補を距離順にソートするだけの単純な方式を
 //   採用しており、これにより市境付近でも自然に隣接市町村の候補が
 //   考慮される。
+// - Phase 6 PART B: 府県境付近では隣接府県のデータも同じ候補プールに入れる
+//   （検索対象府県の決定はlib/shelter/crossPrefectureSearch.ts）。
+//   市境と同じく、府県境をまたぐかどうかで順位を変えない。
 
-import { getShelters } from "./shelter/provider.ts";
-import type { PrefectureCode, Region } from "./region/types.ts";
+import { getShelters, type GetSheltersResult } from "./shelter/provider.ts";
+import type { ShelterSearchScope } from "./shelter/crossPrefectureSearch.ts";
+import type { PrefectureCode } from "./region/types.ts";
 import type { Shelter } from "./shelter/types.ts";
 
 export type ShelterFeature = {
@@ -59,6 +63,10 @@ export type FloodShelterCandidate = {
   /** Phase 4: 候補の都道府県コード。複数府県に対応したため、UI側で
    *  府県ごとの公式リンク出し分け等に使う（例: ShelterDetailContent.tsx）。 */
   prefectureCode: PrefectureCode;
+  /** Phase 6 PART B: 府県境検索で隣接府県の候補も並ぶため、候補カードに
+   *  「奈良県 生駒市」のような所在地を表示する。元データに無ければnull。 */
+  prefectureName: string | null;
+  municipalityName: string | null;
 };
 
 // 候補として表示する件数。卒論の検証等で変更しやすいよう定数化している。
@@ -83,7 +91,14 @@ function haversineDistanceMeters(
 }
 
 export type FloodCandidateResult =
-  | { status: "ok"; candidates: FloodShelterCandidate[] }
+  | {
+      status: "ok";
+      candidates: FloodShelterCandidate[];
+      /** Phase 6 PART B: 実際にデータを取得できた検索対象府県。 */
+      searchedPrefectureCodes: PrefectureCode[];
+      /** Phase 6 PART B: 取得に失敗した隣接府県（現在府県の失敗はfetch_errorになる）。 */
+      failedPrefectureCodes: PrefectureCode[];
+    }
   | { status: "unsupported" }
   | { status: "fetch_error" };
 
@@ -137,6 +152,8 @@ export function selectFloodCandidates(
     ward: s.ward ?? null,
     category: s.category ?? null,
     prefectureCode: s.prefectureCode,
+    prefectureName: s.prefectureName ?? null,
+    municipalityName: s.municipalityName ?? null,
   }));
 
   withDistance.sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters);
@@ -144,14 +161,52 @@ export function selectFloodCandidates(
   return withDistance.slice(0, poolSize);
 }
 
+/** getShelters()と同じシグネチャ。テストで「どの府県のProviderが呼ばれたか」を
+ *  検証できるよう、findFloodShelterCandidates()へ差し替え可能にしている。 */
+export type ShelterFetcher = (prefectureCode: PrefectureCode) => Promise<GetSheltersResult>;
+
+/**
+ * 検索対象府県（lib/shelter/crossPrefectureSearch.tsのShelterSearchScope）の
+ * 避難所データをまとめて取得し、府県を区別せず距離順に候補を選ぶ
+ * （Phase 6 PART B）。
+ *
+ * 【ランキング】府県が違っても既存のselectFloodCandidates()をそのまま共通利用し、
+ * 行政区域を理由にしたペナルティは付けない（重要なのは距離・洪水対応指定であり、
+ * 府県境をまたぐかどうかではない）。
+ *
+ * 【取得失敗時の安全側の扱い】
+ * - 現在の府県（primaryPrefectureCode）の取得に失敗した場合はfetch_error
+ *   （隣接府県の候補だけを「近い順」として見せると、実際にはより近い
+ *   現在府県の候補を見落とした一覧になるため）。
+ * - boundary_ambiguity（現在の府県を確定できない）では、いずれか1府県でも
+ *   失敗したらfetch_error（どちらが現在の府県か分からない以上、
+ *   片方だけの候補を「近い順」として見せない）。
+ * - 隣接府県の取得だけが失敗した場合は、現在の府県の候補を表示しつつ、
+ *   failedPrefectureCodesでその旨をUIに伝える。
+ */
 export async function findFloodShelterCandidates(
   position: { lat: number; lng: number },
-  region: Region,
-  poolSize: number = CANDIDATE_POOL_SIZE
+  scope: ShelterSearchScope,
+  poolSize: number = CANDIDATE_POOL_SIZE,
+  fetchShelters: ShelterFetcher = getShelters
 ): Promise<FloodCandidateResult> {
-  const result = await getShelters(region);
-  if (result.status === "unsupported") return { status: "unsupported" };
-  if (result.status === "fetch_error") return { status: "fetch_error" };
+  const results = await Promise.all(
+    scope.prefectureCodes.map(async (code) => ({ code, result: await fetchShelters(code) }))
+  );
 
-  return { status: "ok", candidates: selectFloodCandidates(result.shelters, position, poolSize) };
+  const primary = scope.primaryPrefectureCode;
+  const primaryResult = primary ? results.find((r) => r.code === primary)?.result : undefined;
+  if (primaryResult?.status === "unsupported") return { status: "unsupported" };
+  if (primaryResult?.status === "fetch_error") return { status: "fetch_error" };
+
+  const failedPrefectureCodes = results.filter((r) => r.result.status !== "ok").map((r) => r.code);
+  if (primary === null && failedPrefectureCodes.length > 0) return { status: "fetch_error" };
+
+  const shelters = results.flatMap((r) => (r.result.status === "ok" ? r.result.shelters : []));
+  return {
+    status: "ok",
+    candidates: selectFloodCandidates(shelters, position, poolSize),
+    searchedPrefectureCodes: results.filter((r) => r.result.status === "ok").map((r) => r.code),
+    failedPrefectureCodes,
+  };
 }

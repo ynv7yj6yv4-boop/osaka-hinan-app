@@ -5,8 +5,10 @@ import {
   findFloodShelterCandidates,
   type FloodShelterCandidate,
 } from "@/lib/floodShelterCandidates";
-import type { CapabilityStatus } from "@/lib/region/capability";
-import type { Region } from "@/lib/region/types";
+import type { PrefectureCode } from "@/lib/region/types";
+import { PREFECTURE_NAMES } from "@/lib/region/types";
+import type { ShelterSearchScope } from "@/lib/shelter/crossPrefectureSearch";
+import type { ShelterDataCompleteness } from "@/lib/shelter/dataCompleteness";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import {
   evaluateRouteFloodHazard,
@@ -43,6 +45,11 @@ function formatMeters(m: number): string {
   return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
 }
 
+/** 候補カードの所在地表示（例:「奈良県 生駒市」）。元データに無ければ府県名のみ。 */
+function formatCandidateLocation(c: FloodShelterCandidate): string {
+  return [c.prefectureName ?? PREFECTURE_NAMES[c.prefectureCode], c.municipalityName].filter(Boolean).join(" ");
+}
+
 function formatRatio(r: number | null): string {
   if (r === null) return "評価不可";
   return `約${(r * 100).toFixed(1)}%`;
@@ -77,29 +84,25 @@ const VIEW_TITLE: Record<View, string> = {
 
 export default function EvacuationPanel({
   position,
-  region,
-  shelterAvailability,
-  inundationTileUrl,
+  searchScope,
+  shelterDataCompleteness,
+  onCandidatesChange,
   onClose,
   onRoutesChange,
   onStartNavigation,
 }: {
   position: LatLng;
-  /** Phase 3（地域拡張）: 避難所Provider（lib/shelter/provider.ts）が
-   *  都道府県を解決するために必要。shelterAvailabilityが"supported"の場合は
-   *  必ず非nullになる（MapView.tsx側で同じregionCheckから導出している）。 */
-  region: Region | null;
-  /** 地域判定基盤（Phase 2）: 現在地の避難所データ対応状況（lib/region/capability.ts参照）。
-   *  "supported"以外（大阪府外の地域等）では、避難所データを誤って
-   *  流用せず、「準備中」であることを案内する（データ取得自体を行わない）。 */
-  shelterAvailability: CapabilityStatus;
-  /** 2026-09-30の方針・訂正版: 内水氾濫データが確認できる地域でのみ、
-   *  MapView.tsxが該当都道府県のタイルURLを渡す。nullの場合、区間別評価
-   *  （下記）は内水氾濫を評価しない（タイルへのリクエスト自体を行わない）。 */
-  inundationTileUrl: string | null;
+  /** Phase 6 PART B: 避難先候補の検索対象府県（lib/shelter/crossPrefectureSearch.ts）。
+   *  nullの場合（近畿外・地域を判定できない等）は、避難所データを誤って流用せず、
+   *  「準備中」であることを案内する（データ取得自体を行わない）。 */
+  searchScope: ShelterSearchScope | null;
+  /** Phase 6 PART D: 現在地の市区町村の公式避難所データ提供状況。 */
+  shelterDataCompleteness: ShelterDataCompleteness;
+  /** Phase 6 PART B: 候補一覧が確定したら呼ばれる（地図上の隣接府県候補の表示用）。 */
+  onCandidatesChange: (candidates: FloodShelterCandidate[]) => void;
   onClose: () => void;
   /** ルート一覧が変化するたびに呼ばれる。地図への描画はMapView側で行う。
-   *  riskSegmentsは選択中ルートの区間別リスク評価(DEM＋洪水、地域によっては内水氾濫も)。
+   *  riskSegmentsは選択中ルートの区間別リスク評価(DEM＋洪水)。
    *  未評価/評価中/取得失敗の場合はnull(地図側は従来の単色ルート表示のままにする)。 */
   onRoutesChange: (
     data: {
@@ -114,14 +117,16 @@ export default function EvacuationPanel({
 }) {
   const [view, setView] = useState<View>("candidates");
 
-  // 地域判定基盤（Phase 2/3）: 現在地が避難所データ対応地域でない場合（大阪府外等）。
-  // shelterAvailabilityはpropsであり、このパネルが開いている間に変化しない
+  // 地域判定基盤（Phase 2/3）: 現在地が避難所データ対応地域でない場合（近畿外等）。
+  // searchScopeはpropsであり、このパネルが開いている間に変化しない
   // 前提のため、stateではなく素の派生値として扱う（不要なeffect/setStateを避ける）。
   // candidatesError（取得失敗）とは意味が異なるため別のNoticeにする
   // （「準備中」を「エラー」のように見せない）。
-  const candidatesUnsupported = shelterAvailability !== "supported" || region === null;
+  const candidatesUnsupported = searchScope === null;
 
   const [candidates, setCandidates] = useState<FloodShelterCandidate[] | null>(null);
+  // Phase 6 PART B: 取得に失敗した隣接府県（現在府県の候補は表示できている場合）。
+  const [failedNeighborPrefectures, setFailedNeighborPrefectures] = useState<PrefectureCode[]>([]);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
   const [candidatesLoading, setCandidatesLoading] = useState(!candidatesUnsupported);
 
@@ -160,15 +165,14 @@ export default function EvacuationPanel({
     // candidatesLoadingはuseState(true)で既に初期値trueであり、このeffectは
     // マウント時に一度だけ実行される(依存配列は空)ため、ここで改めて
     // setCandidatesLoading(true)を呼ぶ必要はない(常にno-opだった)。
-    // 地域判定基盤（Phase 2/3）: この地域の避難所データがまだ無い場合
-    // （大阪府外等）、大阪府の避難所データを誤って取得・表示しない。
+    // 地域判定基盤（Phase 2/3）: この地域の避難所データが無い場合
+    // （近畿外等）、他府県の避難所データを誤って取得・表示しない。
     // 取得自体を行わない（candidatesUnsupportedは上でcandidatesLoadingの
-    // 初期値にも反映済み。region===nullの場合もここでreturnするため、
-    // 以降のfindFloodShelterCandidates呼び出し時点でregionは必ず非null）。
-    if (candidatesUnsupported || region === null) return;
+    // 初期値にも反映済み）。
+    if (searchScope === null) return;
 
     let cancelled = false;
-    findFloodShelterCandidates(position, region).then((result) => {
+    findFloodShelterCandidates(position, searchScope).then((result) => {
       if (cancelled) return;
       setCandidatesLoading(false);
       if (result.status === "fetch_error") {
@@ -176,9 +180,15 @@ export default function EvacuationPanel({
       } else if (result.status === "unsupported") {
         setCandidatesError("この地域の避難場所データは現在準備中です。");
       } else if (result.candidates.length === 0) {
-        setCandidatesError("現在のデータでは、洪水対応の避難先候補を確認できませんでした。");
+        // 「避難所が無い」とは断定しない（公式データに洪水対応の指定が
+        // 登録されていないだけの可能性がある）。
+        setCandidatesError(
+          "現在のデータでは、洪水対応の避難先候補を確認できませんでした。避難先が無いという意味ではありません。市区町村の公式情報をご確認ください。"
+        );
       } else {
         setCandidates(result.candidates);
+        setFailedNeighborPrefectures(result.failedPrefectureCodes);
+        onCandidatesChange(result.candidates);
       }
     });
     return () => {
@@ -268,8 +278,9 @@ export default function EvacuationPanel({
     }
     setView("routeDetail");
 
-    // DEM標高＋洪水（内水氾濫データが確認できる地域では内水氾濫も）による
-    // 区間別リスク評価(このルートを見ている間だけ)。
+    // DEM標高＋洪水による区間別リスク評価(このルートを見ている間だけ)。
+    // Phase 6: 内水氾濫はアプリ全体の対象外のため、inundationTileUrlは渡さない
+    // （内水氾濫タイルへのリクエスト自体を行わない）。
     // 【重要】既存のroutingLoading/hazardEvalLoading/routeResultsとは独立した
     // 付加評価。失敗してもroutesError/routeResultsには一切触れない。
     setExpandedSegmentIndex(null);
@@ -278,7 +289,7 @@ export default function EvacuationPanel({
     if (!r) return;
     const requestId = ++segmentRiskRequestIdRef.current;
     setSegmentRiskLoading(true);
-    evaluateRouteSegmentRisk(r.route.geometry, { inundationTileUrl })
+    evaluateRouteSegmentRisk(r.route.geometry)
       .then((result) => {
         if (segmentRiskRequestIdRef.current !== requestId) return; // 古いrequestは無視(ルート切り替え済み)
         setSegmentRisk(result.segments);
@@ -291,6 +302,12 @@ export default function EvacuationPanel({
         if (segmentRiskRequestIdRef.current === requestId) setSegmentRiskLoading(false);
       });
   };
+
+  // Phase 6 PART B: 隣接府県の候補が一覧に含まれているか（府県境付近の検索時のみ）。
+  const includesOtherPrefectureCandidates =
+    searchScope !== null &&
+    (searchScope.reason === "boundary_ambiguity" ||
+      (candidates ?? []).some((c) => c.prefectureCode !== searchScope.primaryPrefectureCode));
 
   const modalTitle =
     view === "routeDetail"
@@ -331,6 +348,32 @@ export default function EvacuationPanel({
               候補を検索しています…
             </p>
           )}
+          {/* Phase 6 PART B: 府県境付近で隣接府県の候補を含む場合の案内（候補一覧内の小さな補足）。 */}
+          {candidates && includesOtherPrefectureCandidates && (
+            <p className="mt-2 rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] px-2.5 py-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+              {searchScope?.reason === "boundary_ambiguity"
+                ? "府県境のすぐ近くのため現在地の府県を確定できません。候補となる府県の避難先を合わせて表示しています。"
+                : "府県境付近のため、隣接する府県の避難先も候補に含めています。"}
+            </p>
+          )}
+          {candidates && failedNeighborPrefectures.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-[var(--color-warning)]">
+              {failedNeighborPrefectures.map((code) => PREFECTURE_NAMES[code]).join("・")}
+              の避難所データを取得できなかったため、その府県の避難先は候補に含まれていません。
+            </p>
+          )}
+          {/* Phase 6 PART D: 現在地の市区町村で公式データが部分提供の場合の補足。 */}
+          {shelterDataCompleteness.emergencyEvacuationSites === "unavailable" && (
+            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-muted)]">
+              この地域では、公式避難所データの一部のみ提供されています（現在地の市町村の指定緊急避難場所データは公式に提供されていないため、候補は周辺市町村の避難先が中心になります）。
+            </p>
+          )}
+          {shelterDataCompleteness.emergencyEvacuationSites !== "unavailable" &&
+            shelterDataCompleteness.designatedShelters === "unavailable" && (
+              <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-muted)]">
+                この地域では、公式避難所データの一部のみ提供されています（現在地の市町村の指定避難所データは公式に提供されていません）。
+              </p>
+            )}
           {candidatesUnsupported && (
             <div className="mt-4">
               <Notice tone="info" title="この地域の避難所データは現在準備中です">
@@ -349,6 +392,7 @@ export default function EvacuationPanel({
             {candidates?.map((c) => (
               <li key={c.id} className="rounded-[var(--radius-md)] border-2 border-[var(--color-border)] p-3.5">
                 <div className="text-base font-bold text-[var(--color-text-primary)]">{c.name}</div>
+                <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{formatCandidateLocation(c)}</div>
                 <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
                   直線距離：約{formatMeters(c.straightLineDistanceMeters)}
                 </div>
@@ -511,11 +555,10 @@ export default function EvacuationPanel({
           </section>
           <section>
             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-              区間別の参考評価（標高・洪水{inundationTileUrl ? "・内水氾濫" : ""}）
+              区間別の参考評価（標高・洪水）
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
-              標高・洪水{inundationTileUrl ? "・内水氾濫" : ""}
-              の情報をもとにした、このアプリ独自の参考評価です。実際の道路状況や浸水状況を保証するものではありません。国土地理院・大阪市等のデータを、このアプリが独自に組み合わせて評価したものであり、国や自治体がこの区間を危険と判定しているわけではありません。
+              標高・洪水の情報をもとにした、このアプリ独自の参考評価です。実際の道路状況や浸水状況を保証するものではありません。国土地理院・国土交通省等のデータを、このアプリが独自に組み合わせて評価したものであり、国や自治体がこの区間を危険と判定しているわけではありません。
             </p>
 
             {segmentRiskLoading && (
@@ -584,8 +627,7 @@ export default function EvacuationPanel({
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
               自治体の洪水対応指定：あり（国土地理院データ）
               <br />
-              使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域
-              {inundationTileUrl ? "・内水氾濫浸水想定区域" : ""}）
+              使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域）
               <br />
               使用標高データ：国土地理院 標高タイル（基盤地図情報数値標高モデル）を加工して作成。標高は測量時点のものであり、現在の状況を示すリアルタイムデータではありません。
               <br />

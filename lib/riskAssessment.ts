@@ -3,12 +3,11 @@
 // 設計方針（ユーザーとの合意事項）:
 // - 洪水のハザードタイル画像の色を読み取り、浸水深ランクを判定する
 //   （試作2以降、高潮は研究対象から除外したためRiskLevel算出には使用しない）
-// - 【2026-09-30の方針・訂正版】内水氾濫は「データが確認できない地域」でのみ
-//   評価を省略する。データが存在する可能性がある地域（lib/region/
-//   inlandFloodAvailability.tsで"unsupported"以外の都道府県）では、
-//   従来どおり内水氾濫も評価する。assessRisk()の呼び出し元（MapView.tsx）が
-//   現在地の都道府県のinlandFlood対応状況を見て、対象URLを渡すか
-//   省略するかを決める（下記assessRisk()のinundationTileUrl引数参照）。
+// - 【Phase 6（2026-09-30）の方針】内水氾濫はアプリ全体で現行の対象外
+//   （lib/region/capability.tsのINLAND_FLOOD_EVALUATION_ENABLED参照）。
+//   呼び出し元（MapView.tsx）はinundationTileUrlを渡さないため、評価対象は
+//   洪水のみで、内水氾濫タイルへのリクエストも行わない。将来の再導入に備え、
+//   inundationTileUrlを渡された場合だけ内水氾濫も評価する仕組み自体は残している。
 //   高潮のタイルURL・判定関数自体は components/hazardLayers.ts に残している
 //   （完全削除はしない。将来的な再対応や他機能からの参照に備える）。
 // - リアルタイムの降雨・河川水位・気象警報は「まだ使えないデータ」として明示し、
@@ -153,13 +152,12 @@ const RECOMMENDATION_TEXT: Record<RiskLevel, string> = {
   caution:
     "ハザードマップ上でわずかな浸水リスクが想定されています。今後の気象情報に注意し、お住まいの地域の避難場所や避難経路を事前に確認しておきましょう。",
   prepare:
-    "この場所はハザードマップ上で浸水想定区域に含まれています。今後の気象情報や大阪市等の公式避難情報を確認し、災害発生時は早めの避難を検討してください。",
+    "この場所はハザードマップ上で浸水想定区域に含まれています。今後の気象情報や市区町村等の公式避難情報を確認し、災害発生時は早めの避難を検討してください。",
   evacuate: "この場所は特に深刻な浸水が想定されています。災害発生時は速やかな避難を検討してください。",
 };
 
-// 常に評価する基本ハザード。内水氾濫は地域によって追加されるかどうかが
-// 変わるため、ここには含めない（buildRiskResult()のhazardKeys引数、
-// assessRisk()のinundationTileUrl引数を参照）。
+// 常に評価する基本ハザード。内水氾濫は現行の対象外のため含めない
+// （将来の再導入時はassessRisk()のinundationTileUrl引数で追加される）。
 const BASE_HAZARD_KEYS: HazardKey[] = ["flood"];
 
 /**
@@ -299,12 +297,10 @@ export function buildRiskResult(params: {
 }
 
 /**
- * @param inundationTileUrl 内水氾濫データが確認できる地域でのみ、呼び出し元
- *   （MapView.tsx）が該当都道府県用のタイルURL（hazardLayers.tsの
- *   getInundationTileUrl()）を渡す。null/undefinedの場合は内水氾濫を
- *   一切評価しない＝タイルへのリクエスト自体を行わない
- *   （lib/region/inlandFloodAvailability.tsで"unsupported"の地域、
- *   および地域が判定できていない場合はこちらになる）。
+ * @param inundationTileUrl 内水氾濫を評価する場合のみ渡すタイルURL。
+ *   Phase 6で内水氾濫はアプリ全体の対象外としたため、現在の呼び出し元
+ *   （MapView.tsx）は渡さない。null/undefinedの場合は内水氾濫を一切評価しない
+ *   ＝タイルへのリクエスト自体を行わない。
  */
 export async function assessRisk(
   lat: number,

@@ -90,7 +90,7 @@ export function buildRouteJudgmentLog(params: {
     },
     ruleVersion: ROUTE_RULE_VERSION,
     dataSourcesUsed: [
-      "国土地理院 指定緊急避難場所データ（大阪市）",
+      "国土地理院 指定緊急避難場所データ（近畿2府4県）",
       "国土交通省 ハザードマップポータルサイト（洪水浸水想定区域）",
       "openrouteservice（徒歩ルート）",
     ],

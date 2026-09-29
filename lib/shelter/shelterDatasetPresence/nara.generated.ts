@@ -1,0 +1,47 @@
+// このファイルは scripts/build-shelters.mjs が自動生成する（手で編集しないこと）。
+// 奈良県の市町村ごとに、国土地理院の公式CSVをビルド時に読み込めたかどうか。
+// 解釈（available/unavailable/unknown）は lib/shelter/dataCompleteness.ts を参照。
+
+import type { ShelterDatasetPresence } from "../dataCompleteness.ts";
+
+export const NARA_SHELTER_DATASET_PRESENCE: Record<string, ShelterDatasetPresence> = {
+  "29201": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29202": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29203": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29204": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29205": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29206": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29207": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29208": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29209": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29210": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29211": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29212": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29322": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29342": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29343": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29344": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29345": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29361": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29362": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29363": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29385": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29386": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29401": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29402": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29424": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29425": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29426": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29427": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29441": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29442": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29443": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29444": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29446": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29447": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29449": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29450": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29451": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29452": { emergencyEvacuationSites: true, designatedShelters: true },
+  "29453": { emergencyEvacuationSites: true, designatedShelters: true },
+};

@@ -19,6 +19,8 @@ export const HAZARD_LABELS: Record<
   volcano: "火山現象",
 };
 
+// 【Phase 6】内水氾濫はアプリ全体で現行の対象外のため、以下のURLは現在
+// どこからもリクエストされない（将来の再導入に備えて残している）。
 // 地域判定基盤（Phase 2）: 内水浸水想定区域は都道府県ごとに個別配信されている
 // （lib/region/inlandFloodAvailability.ts参照。都道府県コードが存在する＝
 // その県全域でデータが使えるとは限らない）。以前は大阪府コード"27"を

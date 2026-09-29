@@ -21,6 +21,7 @@ import { point } from "@turf/helpers";
 import type { Feature, FeatureCollection, Polygon, MultiPolygon } from "geojson";
 import type { PrefectureCode, Region, RegionCheckResult } from "./types.ts";
 import { PREFECTURE_NAMES } from "./types.ts";
+import { ADJACENT_PREFECTURES } from "./prefectureAdjacency.ts";
 
 type MunicipalityProperties = {
   prefectureCode: PrefectureCode;
@@ -37,7 +38,27 @@ type PrefectureBufferProperties = {
 export type RegionBoundaryData = {
   municipalities: FeatureCollection<Polygon | MultiPolygon, MunicipalityProperties>;
   bufferedPrefectures: FeatureCollection<Polygon | MultiPolygon, PrefectureBufferProperties>;
+  /** Phase 6 PART B: 府県境検索トリガー判定用（CROSS_PREFECTURE_SEARCH_DISTANCE_METERSで
+   *  バッファ済み）。 */
+  crossSearchBufferedPrefectures: FeatureCollection<Polygon | MultiPolygon, PrefectureBufferProperties>;
 };
+
+/**
+ * 現在の都道府県から見て、実際に隣接し（lib/region/prefectureAdjacency.ts）、
+ * かつCROSS_PREFECTURE_SEARCH_DISTANCE_METERS以内にある都道府県コードの
+ * 一覧を返す（Phase 6 PART B）。
+ */
+function findNearbyPrefectureCodes(
+  pt: ReturnType<typeof point>,
+  currentPrefectureCode: PrefectureCode,
+  crossSearchBufferedPrefectures: RegionBoundaryData["crossSearchBufferedPrefectures"]
+): PrefectureCode[] {
+  const adjacentCodes = ADJACENT_PREFECTURES[currentPrefectureCode] ?? [];
+  return adjacentCodes.filter((code) => {
+    const feature = crossSearchBufferedPrefectures.features.find((f) => f.properties.prefectureCode === code);
+    return feature && booleanPointInPolygon(pt, feature as Feature<Polygon | MultiPolygon>);
+  });
+}
 
 function isValidPrefectureCode(code: string): code is PrefectureCode {
   return code in PREFECTURE_NAMES;
@@ -63,7 +84,14 @@ export function lookupRegion(lat: number, lng: number, boundaries: RegionBoundar
 
   if (bufferedMatches.length >= 2) {
     // 複数の都道府県のバッファに同時に入る＝府県境付近で確信が持てない。
-    return { status: "unknown" };
+    // 【重要】これは「どちらの府県か確定できない」という判定そのものを
+    // 変えるものではない。candidatePrefectureCodesは、府県境検索
+    // （lib/shelter/crossPrefectureSearch.ts）が複数府県のShelterデータを
+    // 検索候補にしてよいかどうかの判断材料としてのみ使う（Phase 6 PART B）。
+    const candidatePrefectureCodes = bufferedMatches
+      .map((f) => f.properties.prefectureCode)
+      .filter(isValidPrefectureCode);
+    return { status: "unknown", reason: "boundary_ambiguity", candidatePrefectureCodes };
   }
 
   // ここまでで「ちょうど1つの都道府県バッファにのみ入る」ことが確定している。
@@ -77,6 +105,8 @@ export function lookupRegion(lat: number, lng: number, boundaries: RegionBoundar
     return { status: "error", message: `不正な都道府県コードです: ${bufferedPrefCode}` };
   }
 
+  const nearbyPrefectureCodes = findNearbyPrefectureCodes(pt, bufferedPrefCode, boundaries.crossSearchBufferedPrefectures);
+
   if (municipalityMatch) {
     const p = municipalityMatch.properties;
     const region: Region = {
@@ -84,6 +114,7 @@ export function lookupRegion(lat: number, lng: number, boundaries: RegionBoundar
       prefectureName: p.prefectureName,
       municipalityCode: p.municipalityCode,
       municipalityName: p.municipalityName,
+      nearbyPrefectureCodes,
     };
     return { status: "supported", region };
   }
@@ -95,6 +126,7 @@ export function lookupRegion(lat: number, lng: number, boundaries: RegionBoundar
   const region: Region = {
     prefectureCode: bufferedPrefCode,
     prefectureName: PREFECTURE_NAMES[bufferedPrefCode],
+    nearbyPrefectureCodes,
   };
   return { status: "supported", region };
 }

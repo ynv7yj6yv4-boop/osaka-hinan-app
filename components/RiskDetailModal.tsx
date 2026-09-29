@@ -7,11 +7,9 @@ import Modal from "./ui/Modal";
 import Notice from "./ui/Notice";
 
 // 内部の英語表現(complete/partial/unavailable)を、一般ユーザー向けの日本語に変換する。
-// 【2026-09-30の方針・訂正版】内水氾濫は「データが確認できない地域」でのみ
-// 評価を省略する（除外は全地域一律ではない）。そのため対象ハザード数は
-// 地域によって1件（洪水のみ）または2件（洪水・内水氾濫）と変化する
-// （lib/riskAssessment.ts の assessRisk()・hazardKeys 参照）。ここでは
-// 特定のハザード名を挙げず、件数に依存しない文言にしている。
+// Phase 6で内水氾濫をアプリ全体の対象外としたため、現在の対象ハザードは洪水のみ。
+// 将来ハザードを追加しても文言を変えずに済むよう、特定のハザード名を挙げず、
+// 件数に依存しない文言にしている（lib/riskAssessment.ts の assessRisk() 参照）。
 const COMPLETENESS_TEXT: Record<RiskResult["assessmentCompleteness"], { label: string; detail: string }> = {
   complete: {
     label: "確認できました",
@@ -54,7 +52,7 @@ export default function RiskDetailModal({
       }
     >
       <Notice tone="info" title="このリスク評価は自治体等の公式な避難指示ではありません">
-        大阪市を対象とした静的なハザードマップに基づく参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。
+        静的なハザードマップ（洪水浸水想定区域）に基づく参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。
       </Notice>
 
       <section className="mt-4">

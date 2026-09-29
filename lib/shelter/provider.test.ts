@@ -21,17 +21,13 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { getShelters } from "./provider.ts";
-import type { Region, PrefectureCode } from "../region/types.ts";
+import type { PrefectureCode } from "../region/types.ts";
 import type { Shelter } from "./types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function dataPathFor(slug: string): string {
   return path.join(__dirname, "..", "..", "public", "data", `${slug}-prefecture-shelters.json`);
-}
-
-function makeRegion(overrides: Partial<Region>): Region {
-  return { prefectureCode: "27", prefectureName: "大阪府", ...overrides };
 }
 
 const ALL_KINKI_PREFECTURES: { code: PrefectureCode; name: string; slug: string }[] = [
@@ -45,7 +41,7 @@ const ALL_KINKI_PREFECTURES: { code: PrefectureCode; name: string; slug: string 
 
 test("近畿2府4県すべて（滋賀・京都・大阪・兵庫・奈良・和歌山）はProviderが登録されている（unsupportedにならない）", async () => {
   for (const { code, name } of ALL_KINKI_PREFECTURES) {
-    const result = await getShelters(makeRegion({ prefectureCode: code, prefectureName: name }));
+    const result = await getShelters(code);
     // Node test環境には実サーバーが無いため、fetch自体は失敗する(fetch_error)。
     // ここで確認したいのは「Provider未登録によるunsupportedにはならない」こと
     // （＝PROVIDERSに登録されていること）。
@@ -70,8 +66,7 @@ test("近畿2府4県の外（Provider未登録の都道府県コード）はunsu
   // 引き続き機能することを確認する（実際のアプリではcheckRegion()が
   // 近畿2府4県以外をこのRegion型に変換すること自体がない。あくまで
   // 防御コードの単体テスト）。
-  const mieRegion = { prefectureCode: "24" as PrefectureCode, prefectureName: "三重県" };
-  const result = await getShelters(mieRegion);
+  const result = await getShelters("24" as PrefectureCode);
   assert.equal(result.status, "unsupported");
 });
 

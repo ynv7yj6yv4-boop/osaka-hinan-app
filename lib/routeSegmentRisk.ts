@@ -10,10 +10,11 @@
 // - 「安全」「必ず冠水する」という断定は行わない。統合結果はあくまで
 //   参考区間評価(relatively_low/attention/higher_attention/unknown)。
 //
-// 【2026-09-30の方針・訂正版】内水氾濫は「データが確認できない地域」でのみ
-// 評価を省略する。データが存在する可能性がある地域では引き続き洪水と
-// 併せて評価する。evaluateRouteSegmentRisk()のinundationTileUrl引数が
-// undefined/nullの場合のみ、内水氾濫タイルへのリクエストを一切行わない
+// 【Phase 6（2026-09-30）の方針】内水氾濫はアプリ全体で現行の対象外
+// （lib/region/capability.tsのINLAND_FLOOD_EVALUATION_ENABLED参照）。
+// 呼び出し元（EvacuationPanel.tsx）はinundationTileUrlを渡さないため、
+// 内水氾濫タイルへのリクエストは一切行わない。将来の再導入に備え、
+// inundationTileUrlを渡された場合だけ評価する仕組み自体は残している
 // （lib/riskAssessment.ts の assessRisk() と同じ設計）。
 //
 // 【安全側の統合方針】

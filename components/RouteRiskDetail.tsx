@@ -2,9 +2,8 @@
 
 // 避難ルート区間別リスクの詳細表示。1区間分の理由・洪水/内水/標高情報を、
 // 既存データの意味に忠実な表現で示す(「必ず冠水する」等の断定はしない)。
-// 【重要・2026-09-30の方針・訂正版】内水氾濫は、データが確認できる地域
-// （lib/routeSegmentRisk.ts参照）でのみ評価される。segment.inlandFlood が
-// null の場合（データが確認できない地域）は、内水氾濫の行自体を表示しない
+// 【重要】内水氾濫はPhase 6でアプリ全体の対象外とした（lib/routeSegmentRisk.ts参照）
+// ため、現在は segment.inlandFlood が常に null になり、内水氾濫の行自体を表示しない
 // （「確認できません」と表示して評価対象であるかのように見せない）。
 
 import type { RouteRiskSegment } from "@/lib/routeSegmentRisk";

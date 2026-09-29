@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { APP_NAME, APP_SHORT_NAME, APP_DESCRIPTION } from "@/lib/appInfo";
 
 // 試作3 PART B-1: Web App Manifest。
 // Next.js App Routerの規約により、このファイルは自動的に
@@ -14,10 +15,10 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "大阪市 避難支援マップ",
-    short_name: "避難支援マップ",
-    description:
-      "大阪市を対象とした災害避難支援Webアプリ。現在地の洪水・内水氾濫ハザード情報や、洪水時の参考避難ルートを確認できます。",
+    // Phase 6 PART C: 近畿2府4県対応版の名称へ変更（lib/appInfo.tsで一元管理）。
+    name: APP_NAME,
+    short_name: APP_SHORT_NAME,
+    description: APP_DESCRIPTION,
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

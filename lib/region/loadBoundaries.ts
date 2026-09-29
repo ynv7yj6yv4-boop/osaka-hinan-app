@@ -20,7 +20,12 @@ export function loadRegionBoundaries(): RegionBoundaryData {
   const bufferedPrefectures = JSON.parse(
     readFileSync(path.join(dir, "kinki-prefectures-buffered.geojson"), "utf-8")
   );
+  // Phase 6 PART B: 府県境を越えた避難先候補検索のトリガー判定用
+  // （lib/region/regionBoundaryConfig.tsのCROSS_PREFECTURE_SEARCH_DISTANCE_METERS）。
+  const crossSearchBufferedPrefectures = JSON.parse(
+    readFileSync(path.join(dir, "kinki-prefectures-buffered-cross-search.geojson"), "utf-8")
+  );
 
-  cached = { municipalities, bufferedPrefectures };
+  cached = { municipalities, bufferedPrefectures, crossSearchBufferedPrefectures };
   return cached;
 }

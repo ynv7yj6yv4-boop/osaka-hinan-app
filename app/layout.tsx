@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import DevNotificationTester from "@/components/DevNotificationTester";
+import { APP_NAME, APP_SHORT_NAME, APP_DESCRIPTION } from "@/lib/appInfo";
 import "./globals.css";
 
 // デジタル庁デザインシステムの考え方(タイポグラフィ)を参考に、
@@ -14,11 +15,12 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "大阪市 避難支援マップ",
-  description: "大阪市を対象とした災害避難支援Webアプリ",
+  // Phase 6 PART C: 近畿2府4県対応版の名称へ変更（lib/appInfo.tsで一元管理）。
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
   // 試作3 PART B-4: iOSの「ホーム画面に追加」時のタイトル表示に使われる。
   appleWebApp: {
-    title: "避難支援マップ",
+    title: APP_SHORT_NAME,
     // Safari標準のUI(URLバー等)を隠したstandalone表示にする。
     // ただしEU圏のiOSでは規制(DMA)によりPWAがSafariタブで開く場合がある
     // （detailはチャット記録・data/README.md参照。実機確認が必要）。

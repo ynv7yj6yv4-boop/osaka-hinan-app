@@ -4,6 +4,7 @@ import { useState } from "react";
 import { isIosSafariNotStandalone } from "@/lib/platform";
 import Button from "./ui/Button";
 import { LocationIcon } from "./ui/icons";
+import { APP_NAME, APP_TARGET_PREFECTURES_TEXT } from "@/lib/appInfo";
 
 export default function IntroPanel({
   isLocating,
@@ -21,9 +22,12 @@ export default function IntroPanel({
 
   return (
     <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-sm)]">
-      <h2 className="text-lg font-bold text-[var(--color-text-primary)]">大阪市 災害避難支援</h2>
+      <h2 className="text-lg font-bold text-[var(--color-text-primary)]">{APP_NAME}</h2>
       <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-        現在地のハザード情報から、避難の判断を支援します。
+        現在地の洪水ハザード情報から、避難の判断を支援します。
+      </p>
+      <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-text-muted)]">
+        対象：近畿2府4県（{APP_TARGET_PREFECTURES_TEXT}）
       </p>
       <Button onClick={onLocate} disabled={isLocating} fullWidth size="lg" className="mt-3">
         <LocationIcon className="h-5 w-5 shrink-0" />

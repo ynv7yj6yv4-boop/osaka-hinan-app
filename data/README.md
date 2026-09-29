@@ -123,6 +123,16 @@ Phase6では新しい判定ロジックの追加は行わず、Phase3〜5A.3で�
 - **公式リンクの出し分け**: `OFFICIAL_LINKS`に滋賀県（滋賀県防災ポータル）・奈良県（奈良県防災ポータル）・和歌山県（和歌山県「避難場所・避難所について」）を追加。いずれも実際にアクセスし、都道府県公式ページであることを確認済み。
 - **詳細情報の拡充（電話番号等）について**: 大阪市オープンデータ相当のソースは滋賀県・奈良県・和歌山県に対しても今回調査・導入していないため、常にnull。
 
+### Phase 6（近畿2府4県対応版の仕上げ・データ品質改善、2026-09-30）
+
+- **保守的な重複名寄せ**（`../lib/shelter/deduplicateShelters.ts`、`scripts/build-shelters.mjs`の生成段階で実行。ブラウザ側では判定しない）: 同一municipalityCode・同一shelterType・正規化後の施設名が完全一致・座標差`EXACT_DUPLICATE_DISTANCE_METERS`（5m）以内・`supportedDisasters.flood`と`hazards`が完全一致、のすべてを満たす場合のみ自動統合。名称正規化は比較用のみで、NFKC（全角/半角英数字・半角カナ）と空白の表記ゆれに限る（「小学校」→「○○小」のような意味推測はしない）。統合したレコードは`mergedFrom`に元の共通IDをすべて保持。5m超〜120m以内の同名や、ハザード属性が食い違うペアは統合せず、ビルドログに「要確認」として出力。
+  - 名寄せ前→後（統合クラスタ数／うち洪水候補／要確認ペア）: 滋賀 2,035→2,028（7／0／71）、京都 2,681→2,667（14／1／3）、大阪 8,652→8,639（13／1／8）、兵庫 6,670→6,625（45／0／1）、奈良 2,299→2,289（10／5／13）、和歌山 4,271→4,242（29／0／4）。
+  - 京都府「桃映中学校」、奈良県「ならやま小学校」「登美ヶ丘公民館」「登美ヶ丘中学校」「東登美ヶ丘小学校」「東信貴ヶ丘自治会館」は各1件に統合（二重表示の解消を`deduplicateShelters.test.ts`で回帰確認）。大阪市「市営放出西住宅６号館」（約12m）は統合しない。
+- **市町村別の公式データ提供状況**: `build-shelters.mjs`が市町村ごとに公式CSVを読み込めたかを`../lib/shelter/shelterDatasetPresence/{府県}.generated.ts`へ出力。`../lib/shelter/dataCompleteness.ts`がこれと、国土地理院が公式に未提供と明記しているもの（`../lib/shelter/officialShelterDataGaps.ts`: 近江八幡市の指定緊急避難場所・甲良町の指定避難所）から、`available`／`unavailable`／`unknown`を返す（「両CSVを取得できた」ことは完全性を保証しないため`complete`とは呼ばない）。近畿198市町村中196市町村が両データ`available`。
+- **初期地図表示範囲**: `../scripts/build-kinki-bounds.mjs`が`region-boundaries/kinki-municipalities.geojson`の外接矩形を`../lib/region/kinkiBounds.generated.ts`へ出力（`build-region-boundaries.mjs`の最後にも自動実行）。
+- **府県境検索**: `region-boundaries/kinki-prefectures-buffered-cross-search.geojson`（府県ポリゴンを`CROSS_PREFECTURE_SEARCH_DISTANCE_METERS`=3kmバッファ）を`build-region-boundaries.mjs`が追加生成。
+- **内水氾濫**: 2026-09-30の実測で、近畿の内水氾濫タイルは許諾済み8市町村（堺市・日野町・豊郷町・綾部市・大山崎町・尼崎市・たつの市・上郡町）にしか存在せず、大阪市・京都市・神戸市等の主要都市には存在しないことを確認。アプリ全体で現行の対象外とした（`../lib/region/capability.ts`の`INLAND_FLOOD_EVALUATION_ENABLED`）。
+
 ### 避難所詳細情報の補完（電話番号・避難可能時間・区名・分類）
 
 - **出典**: 大阪市 マップナビおおさか オープンデータ「防災関連施設ポイントデータ（災害時避難所・一時避難場所）」

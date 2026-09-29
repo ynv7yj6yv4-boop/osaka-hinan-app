@@ -13,7 +13,7 @@
 // ため、区のポリゴンは市レベルのコード・名称へ丸め込んで統合する
 // （DESIGNATED_CITY_CODE参照）。
 //
-// 生成される2つのファイル:
+// 生成される3つのファイル:
 // - data/region-boundaries/kinki-municipalities.geojson
 //     市区町村単位のポリゴン（Point in Polygonの主判定に使用）
 // - data/region-boundaries/kinki-prefectures-buffered.geojson
@@ -22,6 +22,11 @@
 //     補助レイヤー。2つ以上の都道府県のバッファ内に同時に入る地点は、
 //     判定を"unknown"にする。バッファ距離はlib/region/regionBoundaryConfig.ts
 //     で1か所だけ管理している）
+// - data/region-boundaries/kinki-prefectures-buffered-cross-search.geojson
+//     Phase 6 PART B: 都道府県単位のポリゴンをCROSS_PREFECTURE_SEARCH_
+//     DISTANCE_METERS分バッファしたもの（府県境を越えた避難先候補検索を
+//     行うべきかどうかの判定に使う。上記のambiguityバッファとは目的も
+//     距離も異なる別レイヤー）
 //
 // 実行方法: node scripts/build-region-boundaries.mjs
 // （ネットワークアクセスが必要。ダウンロードした生データ(約29MB)は
@@ -33,7 +38,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import mapshaper from "mapshaper";
-import { REGION_BOUNDARY_AMBIGUITY_BUFFER_METERS } from "../lib/region/regionBoundaryConfig.ts";
+import { buildKinkiBounds } from "./build-kinki-bounds.mjs";
+import {
+  REGION_BOUNDARY_AMBIGUITY_BUFFER_METERS,
+  CROSS_PREFECTURE_SEARCH_DISTANCE_METERS,
+} from "../lib/region/regionBoundaryConfig.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, "..");
@@ -152,9 +161,26 @@ async function main() {
       `-o format=geojson precision=0.0001 "${bufferedOut}"`
   );
 
+  // Phase 6 PART B: 府県境検索用バッファ（CROSS_PREFECTURE_SEARCH_DISTANCE_METERS）。
+  // 上記のambiguityバッファとは目的（判定のあいまいさ検出 vs 隣接候補検索の
+  // トリガー）も距離も異なるため、別ファイルとして出力する。
+  const crossSearchOut = path.join(outDir, "kinki-prefectures-buffered-cross-search.geojson");
+  await mapshaper.runCommands(
+    `-i "${mergedPath}" ` +
+      `-dissolve prefectureCode copy-fields=prefectureName ` +
+      `-simplify 3% keep-shapes ` +
+      `-clean ` +
+      `-buffer radius=${CROSS_PREFECTURE_SEARCH_DISTANCE_METERS} geodesic ` +
+      `-o format=geojson precision=0.0001 "${crossSearchOut}"`
+  );
+
   console.log("完了:");
   console.log(" -", municipalitiesOut);
   console.log(" -", bufferedOut);
+  console.log(" -", crossSearchOut);
+
+  // Phase 6 PART C: 初期地図表示範囲（境界データの外接矩形）も同じ境界データから再生成する。
+  console.log(" -", buildKinkiBounds());
 }
 
 main().catch((err) => {

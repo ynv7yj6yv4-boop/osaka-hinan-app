@@ -17,6 +17,7 @@
 // FCMバックグラウンド受信)を統合している。
 
 import { NextResponse } from "next/server";
+import { APP_NAME } from "@/lib/appInfo";
 
 const FIREBASE_JS_SDK_VERSION = "12.18.0";
 
@@ -88,7 +89,7 @@ const messaging = firebase.messaging();
 // PART F-4: 初期通知は「避難命令」ではなく「リスク上昇の可能性」程度の
 // 表現にとどめる方針(実際の通知判定ルールはStep10で人間の確認後に有効化)。
 messaging.onBackgroundMessage((payload) => {
-  const title = (payload.notification && payload.notification.title) || "大阪市 避難支援マップ";
+  const title = (payload.notification && payload.notification.title) || ${JSON.stringify(APP_NAME)};
   const body = (payload.notification && payload.notification.body) || "";
   self.registration.showNotification(title, {
     body,
