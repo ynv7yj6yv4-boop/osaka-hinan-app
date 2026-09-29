@@ -90,6 +90,22 @@ Phase6では新しい判定ロジックの追加は行わず、Phase3〜5A.3で�
 - **洪水対応(flood)の3状態の判断根拠**: 指定緊急避難場所データの「洪水」列は「該当は1、非該当は無記入」という国土地理院の公式なデータ項目定義があるため、無記入を明示的な"false"（非該当という行政判断）として扱う。指定避難所データには災害種別の列自体が存在しないため、常に"unknown"とする（「対応していない」と断定できる情報が無いため）。
 - **旧・大阪市専用データとの関係**: `raw/27100_shitei-*.csv`・`../public/data/osaka-shelters.json`（大阪市のみ、Phase6時点）は削除せず、移行中の比較検証用として残している。`../scripts/build-shelters.mjs`はもうこのファイルを生成しない。
 
+### Phase 4（京都府・兵庫県への拡張、2026-09-30）
+
+- **出典**: 国土地理院 指定緊急避難場所・指定避難所データ（京都府内26市町村・兵庫県内41市町村すべて）。Phase 3と同一のデータソース・URL構造。
+- **取得日**: 2026-09-30
+- **対象市町村**: `data/region-boundaries/kinki-municipalities.geojson`のprefectureCode==="26"（京都府）/"28"（兵庫県）から動的に取得。京都府26市町村・兵庫県41市町村すべてで実際に個別レコードが存在することを確認済み（取得失敗0件、データ0件の市町村も0件）。
+  - 京都府: 総件数2,681件（指定緊急避難場所1,450・指定避難所1,231）。洪水対応(flood:true) 1,095件。
+  - 兵庫県: 総件数6,670件（指定緊急避難場所3,669・指定避難所3,001）。洪水対応(flood:true) 2,695件。
+- **利用規約**: 京都府・兵庫県とも大阪府と同一の全国共通データ仕様・利用規約（`raw/gsi-notice.txt`・国土地理院コンテンツ利用規約）。
+- **生データ**: `raw/{市町村コード}_shitei-kinkyu-hinanbasho.csv`・`raw/{市町村コード}_shitei-hinanjo.csv`を京都府26市町村分（52ファイル、計457KB）・兵庫県41市町村分（82ファイル、計960KB）追加。
+- **取得スクリプト**: `../scripts/fetch-shelter-source-data.mjs`（Phase 3から都道府県コードを引数に取れる設計のため無変更で再利用。`node scripts/fetch-shelter-source-data.mjs 26`・`28`）
+- **変換スクリプト**: `../scripts/build-shelters.mjs`を都道府県コード引数対応へ一般化（`node scripts/build-shelters.mjs 26`・`28`）。出力ファイル名は`lib/region/types.ts`の`PREFECTURE_SLUGS`から決定（大阪府専用のハードコードを解消）。
+- **生成JSON**: `../public/data/kyoto-prefecture-shelters.json`（1.35MB、gzip相当約100KB）、`../public/data/hyogo-prefecture-shelters.json`（3.29MB、gzip相当約232KB）。大阪府データと統合せず都道府県ごとに分離（利用者は現在地の都道府県のJSONのみをダウンロードする）。
+- **詳細情報の拡充（電話番号等）について**: 大阪市オープンデータ相当のソースは京都府・兵庫県に対して今回調査・導入していないため、京都府・兵庫県のレコードは`telephone`/`availableHours`/`ward`/`category`が常にnull。
+- **Provider構成**: `../lib/shelter/jsonShelterProvider.ts`の`createJsonShelterProvider(url)`が大阪・京都・兵庫3府県で共通のfetch/キャッシュロジックを提供し、`osakaProvider.ts`・`kyotoProvider.ts`・`hyogoProvider.ts`はそれぞれ1行でURLを指定するだけの薄いラッパー。`../lib/shelter/provider.ts`の`PROVIDERS`に都道府県コードごとに登録。
+- **公式リンクの出し分け**: `components/ShelterDetailContent.tsx`の`OFFICIAL_LINKS`を都道府県コード別に変更（大阪府の候補に「おおさか防災ネット」、京都府に「京都府 指定緊急避難場所・指定避難所情報」、兵庫県に「兵庫県CGハザードマップ 指定避難場所」を表示。各リンクは実際にアクセスし、都道府県公式の避難所情報ページであることを確認済み）。
+
 ### 避難所詳細情報の補完（電話番号・避難可能時間・区名・分類）
 
 - **出典**: 大阪市 マップナビおおさか オープンデータ「防災関連施設ポイントデータ（災害時避難所・一時避難場所）」

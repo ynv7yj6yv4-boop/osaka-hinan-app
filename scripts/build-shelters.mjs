@@ -1,19 +1,26 @@
-// 国土地理院「指定緊急避難場所・指定避難所データ」（大阪府内43市町村）を
+// 国土地理院「指定緊急避難場所・指定避難所データ」（都道府県内の全市町村）を
 // アプリで使いやすいJSON形式に変換するスクリプト。
 //
-// 【Phase 3: 大阪市→大阪府全域への拡張】従来は大阪市（市町村コード27100）のみを
-// 対象にしていたが、大阪府内の全43市町村（大阪市・堺市・豊中市・吹田市・
-// 東大阪市・高槻市・岸和田市・枚方市等）を対象とするよう一般化した。
+// 【Phase 4: 都道府県コードを引数に取る一般的な構造へ】従来は大阪府（27）
+// 専用だったが、`node scripts/build-shelters.mjs 26`（京都府）・
+// `node scripts/build-shelters.mjs 28`（兵庫県）のように、都道府県コードを
+// 第1引数に指定して任意の近畿2府4県を処理できるよう一般化した
+// （省略時は"27"＝大阪府。既存の呼び出し方との後方互換性を維持）。
 // 対象市町村コードの一覧は lib/region の境界データ
-// （data/region-boundaries/kinki-municipalities.geojson、
-// prefectureCode==="27"）から動的に取得する（ハードコードの二重管理を避ける）。
+// （data/region-boundaries/kinki-municipalities.geojson）から動的に取得する
+// （ハードコードの二重管理を避ける）。出力先ファイル名は
+// lib/region/types.ts の PREFECTURE_SLUGS から決める
+// （例: 26→kyoto-prefecture-shelters.json）。
 //
 // 出典データ(基本): https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html
 // 生データは data/raw/ に保存している（利用規約は data/raw/gsi-notice.txt を参照）。
 // ダウンロードURLパターン: https://hinanmap.gsi.go.jp/hinanjocp/defaultFtpData/csv/{市町村コード}_2.csv
 // （指定緊急避難場所）／ https://hinanmap.gsi.go.jp/hinanjocp/defaultFtpData/csv/{市町村コード}_1.csv
 // （指定避難所）。実際にPlaywrightでダウンロードページのJS(dlFile関数)を
-// 解析して確認したURL構造（2026-09-29確認）。
+// 解析して確認したURL構造（2026-09-29確認、全都道府県で共通のURL構造）。
+// 実際のダウンロードは scripts/fetch-shelter-source-data.mjs（都道府県コード
+// を引数に取る、Phase 3から一般化済み）が担当し、このスクリプトはdata/raw/の
+// 既存CSVを変換するだけで、ネットワークアクセスは行わない。
 //
 // 【共通Shelter型への変換】lib/shelter/types.ts の Shelter 型で出力する。
 // - shelterType: 指定緊急避難場所→"designated_emergency_evacuation_site"、
@@ -26,8 +33,9 @@
 //
 // 【避難所詳細情報の拡充（大阪市のみ）】大阪市「マップナビおおさか オープンデータ」
 // （防災関連施設ポイントデータ）から、電話番号・避難可能時間・区名・分類を
-// 補完する。この拡充データは大阪市のみに存在するため、大阪市（27100）の
-// レコードにのみ適用する（出典・ライセンス等は data/README.md 参照）。
+// 補完する。この拡充データは大阪市にのみ存在する（京都府・兵庫県には
+// 同等のオープンデータソースを今回調査・導入していない）ため、
+// 大阪府（27）を処理する場合のみ実行する。
 //
 // 【名寄せの方針(安全側)】施設名の完全一致に頼らず、
 // 「座標が近い(120m以内)」かつ「正規化した施設名が一致または包含関係にある」
@@ -35,18 +43,19 @@
 //
 // 【既存ファイルとの関係】旧・大阪市専用の public/data/osaka-shelters.json は
 // このスクリプトではもう生成しない（このファイル自体は削除せず、移行中の
-// 比較検証用として残している）。生成先は public/data/osaka-prefecture-shelters.json。
+// 比較検証用として残している）。
 //
-// 実行方法: node scripts/build-shelters.mjs
+// 実行方法: node scripts/build-shelters.mjs [都道府県コード]
+//   例: node scripts/build-shelters.mjs 26  (京都府)
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { matchShelterEnrichment } from "../lib/shelterEnrichmentMatching.ts";
+import { PREFECTURE_SLUGS } from "../lib/region/types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rawDir = path.join(__dirname, "..", "data", "raw");
-const outPath = path.join(__dirname, "..", "public", "data", "osaka-prefecture-shelters.json");
 const boundaryPath = path.join(
   __dirname,
   "..",
@@ -55,18 +64,35 @@ const boundaryPath = path.join(
   "kinki-municipalities.geojson"
 );
 
+const PREFECTURE_CODE = process.argv[2] ?? "27";
+const slug = PREFECTURE_SLUGS[PREFECTURE_CODE];
+if (!slug) {
+  console.error(`[build-shelters] 未対応の都道府県コードです: "${PREFECTURE_CODE}"（PREFECTURE_SLUGSに登録がありません）`);
+  process.exit(1);
+}
+const outPath = path.join(__dirname, "..", "public", "data", `${slug}-prefecture-shelters.json`);
+
 // ============================================================
-// 対象市町村一覧（大阪府内、lib/regionの境界データから取得）
+// 対象市町村一覧（指定した都道府県内、lib/regionの境界データから取得）
 // ============================================================
 
 const boundaries = JSON.parse(readFileSync(boundaryPath, "utf-8"));
-const osakaMunicipalities = boundaries.features
+const targetMunicipalities = boundaries.features
   .map((f) => f.properties)
-  .filter((p) => p.prefectureCode === "27")
+  .filter((p) => p.prefectureCode === PREFECTURE_CODE)
   .map((p) => ({ code: p.municipalityCode, name: p.municipalityName }))
   .sort((a, b) => a.code.localeCompare(b.code));
 
-console.log(`[build-shelters] 対象市町村: ${osakaMunicipalities.length}件`);
+if (targetMunicipalities.length === 0) {
+  console.error(`[build-shelters] 都道府県コード "${PREFECTURE_CODE}" の市町村が境界データに見つかりません。`);
+  process.exit(1);
+}
+
+const PREFECTURE_NAME = boundaries.features.find(
+  (f) => f.properties.prefectureCode === PREFECTURE_CODE
+).properties.prefectureName;
+
+console.log(`[build-shelters] 対象: ${PREFECTURE_NAME}（${PREFECTURE_CODE}） 市町村: ${targetMunicipalities.length}件`);
 
 // ============================================================
 // CSVパーサ（RFC4180準拠：ダブルクォートで囲まれたフィールド内の改行・カンマ・
@@ -135,9 +161,6 @@ function readCsvIfExists(filePath) {
 // 市町村ごとにCSVを読み込み、共通Shelter型へ変換
 // ============================================================
 
-const PREFECTURE_CODE = "27";
-const PREFECTURE_NAME = "大阪府";
-
 // 指定緊急避難場所データの災害種別列(表示用。洪水対応の判定には
 // supportedDisasters.floodを使う。このHAZARD_COLUMNSは既存UI
 // （対応災害バッジ等）との互換性のために引き続き全種別を収集する)。
@@ -156,7 +179,7 @@ const allFeatures = [];
 const missingFiles = [];
 let missingLatLngCount = 0;
 
-for (const { code, name: municipalityName } of osakaMunicipalities) {
+for (const { code, name: municipalityName } of targetMunicipalities) {
   const kinkyuPath = path.join(rawDir, `${code}_shitei-kinkyu-hinanbasho.csv`);
   const hinanjoPath = path.join(rawDir, `${code}_shitei-hinanjo.csv`);
 
@@ -237,64 +260,78 @@ for (const f of allFeatures) {
 }
 
 // ============================================================
-// 大阪市「マップナビおおさか オープンデータ」による詳細情報の補完（大阪市のみ）
+// 大阪市「マップナビおおさか オープンデータ」による詳細情報の補完
+// （大阪府（27）を処理する場合のみ。京都府・兵庫県には同等の
+// オープンデータソースを今回導入していないため、telephone等は常にnullになる）
 // ============================================================
-
-const OSAKA_CITY_CSV_PATH = path.join(rawDir, "osaka-city-opendata-shelters.csv");
 
 let cityRows = [];
 let cityMeta = null;
-try {
-  const cityText = readFileSync(OSAKA_CITY_CSV_PATH, "utf-8");
-  cityRows = parseCsv(cityText);
-} catch {
-  console.warn(
-    "[build-shelters] 大阪市オープンデータ(data/raw/osaka-city-opendata-shelters.csv)が見つからないため、詳細情報の補完をスキップします。"
-  );
-}
+let featuresWithEnrichment;
 
-const cityRecords = cityRows
-  .map((row) => ({
-    name: row["場所の名前"],
-    lat: Number(row["緯度"]),
-    lng: Number(row["経度"]),
-    telephone: row["TEL"],
-    availableHours: row["避難可能時間"],
-    ward: row["区名"],
-    category: row["分類"],
-  }))
-  .filter((r) => r.lat && r.lng);
+if (PREFECTURE_CODE === "27") {
+  const OSAKA_CITY_CSV_PATH = path.join(rawDir, "osaka-city-opendata-shelters.csv");
+  try {
+    const cityText = readFileSync(OSAKA_CITY_CSV_PATH, "utf-8");
+    cityRows = parseCsv(cityText);
+  } catch {
+    console.warn(
+      "[build-shelters] 大阪市オープンデータ(data/raw/osaka-city-opendata-shelters.csv)が見つからないため、詳細情報の補完をスキップします。"
+    );
+  }
 
-// 補完の対象は大阪市（27100）のレコードのみ（大阪市オープンデータが
-// カバーするのは大阪市域のみのため、他市町村への誤補完を避ける）。
-const osakaCityFeatures = dedupedFeatures.filter((f) => f.municipalityCode === "27100");
+  const cityRecords = cityRows
+    .map((row) => ({
+      name: row["場所の名前"],
+      lat: Number(row["緯度"]),
+      lng: Number(row["経度"]),
+      telephone: row["TEL"],
+      availableHours: row["避難可能時間"],
+      ward: row["区名"],
+      category: row["分類"],
+    }))
+    .filter((r) => r.lat && r.lng);
 
-const { enrichmentByGsiId, report } = matchShelterEnrichment(osakaCityFeatures, cityRecords);
+  // 補完の対象は大阪市（27100）のレコードのみ（大阪市オープンデータが
+  // カバーするのは大阪市域のみのため、他市町村への誤補完を避ける）。
+  const osakaCityFeatures = dedupedFeatures.filter((f) => f.municipalityCode === "27100");
 
-const featuresWithEnrichment = dedupedFeatures.map((f) => {
-  const enrichment = enrichmentByGsiId.get(f.id);
-  return {
+  const { enrichmentByGsiId, report } = matchShelterEnrichment(osakaCityFeatures, cityRecords);
+
+  featuresWithEnrichment = dedupedFeatures.map((f) => {
+    const enrichment = enrichmentByGsiId.get(f.id);
+    return {
+      ...f,
+      telephone: enrichment?.telephone ?? null,
+      availableHours: enrichment?.availableHours ?? null,
+      ward: enrichment?.ward ?? null,
+      category: enrichment?.category ?? null,
+    };
+  });
+
+  if (cityRows.length > 0) {
+    cityMeta = {
+      source: "大阪市 マップナビおおさか オープンデータ（防災関連施設ポイントデータ）",
+      sourceUrl: "https://www.city.osaka.lg.jp/toshikeikaku/page/0000250227.html",
+      license: "CC BY",
+      coverage: "大阪市（27100）のレコードのみ補完（大阪市以外は telephone/availableHours/ward/category が常にnull）",
+    };
+
+    console.log("\n[build-shelters] 大阪市データによる名寄せレポート");
+    console.log(`  大阪市データ件数: ${report.totalCityRecords}`);
+    console.log(`  マッチ成功: ${report.matchedCount}`);
+    console.log(`  未マッチ: ${report.unmatchedCount}`);
+    console.log(`  あいまい(要手動確認・補完スキップ): ${report.ambiguousCount}`);
+  }
+} else {
+  // 大阪府以外: 詳細情報の拡充データソースが無いため、常にnull(推測で埋めない)。
+  featuresWithEnrichment = dedupedFeatures.map((f) => ({
     ...f,
-    telephone: enrichment?.telephone ?? null,
-    availableHours: enrichment?.availableHours ?? null,
-    ward: enrichment?.ward ?? null,
-    category: enrichment?.category ?? null,
-  };
-});
-
-if (cityRows.length > 0) {
-  cityMeta = {
-    source: "大阪市 マップナビおおさか オープンデータ（防災関連施設ポイントデータ）",
-    sourceUrl: "https://www.city.osaka.lg.jp/toshikeikaku/page/0000250227.html",
-    license: "CC BY",
-    coverage: "大阪市（27100）のレコードのみ補完（大阪市以外は telephone/availableHours/ward/category が常にnull）",
-  };
-
-  console.log("\n[build-shelters] 大阪市データによる名寄せレポート");
-  console.log(`  大阪市データ件数: ${report.totalCityRecords}`);
-  console.log(`  マッチ成功: ${report.matchedCount}`);
-  console.log(`  未マッチ: ${report.unmatchedCount}`);
-  console.log(`  あいまい(要手動確認・補完スキップ): ${report.ambiguousCount}`);
+    telephone: null,
+    availableHours: null,
+    ward: null,
+    category: null,
+  }));
 }
 
 // ============================================================
@@ -311,7 +348,20 @@ const kinkyuCount = featuresWithEnrichment.filter(
 ).length;
 const hinanjoCount = featuresWithEnrichment.filter((f) => f.shelterType === "designated_shelter").length;
 
+// 市町村ごとのレコード0件チェック（取得はできたがCSVが空、等）。
+const zeroRecordMunicipalities = targetMunicipalities.filter(
+  ({ code }) => !featuresWithEnrichment.some((f) => f.municipalityCode === code)
+);
+const failedMunicipalityCodes = new Set(missingFiles.map((f) => path.basename(f).slice(0, 5)));
+
 console.log("\n[build-shelters] データ品質チェック");
+console.log(`  対象市町村数: ${targetMunicipalities.length}`);
+console.log(`  取得失敗市町村数（生CSVが見つからない）: ${failedMunicipalityCodes.size}`);
+console.log(`  取得成功市町村数: ${targetMunicipalities.length - failedMunicipalityCodes.size}`);
+console.log(`  データ0件の市町村数: ${zeroRecordMunicipalities.length}`);
+if (zeroRecordMunicipalities.length > 0) {
+  for (const m of zeroRecordMunicipalities) console.log(`    - ${m.name}(${m.code})`);
+}
 console.log(`  総件数: ${featuresWithEnrichment.length}`);
 console.log(`  指定緊急避難場所: ${kinkyuCount}`);
 console.log(`  指定避難所: ${hinanjoCount}`);
@@ -326,9 +376,9 @@ console.log(`  重複除去件数（同一共通IDが複数ファイルに存在
 // ============================================================
 
 const output = {
-  source: `国土地理院 指定緊急避難場所・指定避難所データ（大阪府内${osakaMunicipalities.length}市町村）`,
+  source: `国土地理院 指定緊急避難場所・指定避難所データ（${PREFECTURE_NAME}内${targetMunicipalities.length}市町村）`,
   sourceUrl: "https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html",
-  fetchedAt: "2026-09-29",
+  fetchedAt: new Date().toISOString().slice(0, 10),
   notice:
     "本データは各市町村の登録情報のため最新でない場合があります。詳細・最新情報は各市町村の発表をご確認ください。",
   enrichment: cityMeta,

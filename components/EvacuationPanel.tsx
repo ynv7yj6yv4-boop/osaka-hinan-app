@@ -334,7 +334,7 @@ export default function EvacuationPanel({
           {candidatesUnsupported && (
             <div className="mt-4">
               <Notice tone="info" title="この地域の避難所データは現在準備中です">
-                現在の対応地域は大阪府のみです。それ以外の地域では、避難先候補を表示できません。
+                洪水時の避難先候補は現在、大阪府・京都府・兵庫県に対応しています。それ以外の地域では、避難先候補を表示できません（洪水ハザード・標高・降雨等、避難所データ以外の機能は近畿2府4県で利用できる場合があります）。
               </Notice>
             </div>
           )}

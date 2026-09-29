@@ -13,17 +13,39 @@
 // ここでは一切表示・推測しない。
 
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
+import type { PrefectureCode } from "@/lib/region/types";
 import { toHazardLabels } from "./hazardLayers";
 import Button from "./ui/Button";
 import Notice from "./ui/Notice";
 
-const OFFICIAL_LINKS = [
-  {
-    label: "おおさか防災ネット 避難所検索",
-    provider: "大阪府",
-    url: "https://www.osaka-bousai.net/shelter/index.html",
-  },
-];
+// Phase 4: 公式リンクは候補の都道府県ごとに出し分ける（大阪府の候補に
+// 京都府のリンクを出す、といった誤りを避けるため）。大阪府・京都府・
+// 兵庫県のみ登録（避難所Providerが対応している都道府県と一致させる）。
+// 各リンクは実際にアクセスし、都道府県公式の避難所情報ページであることを
+// 確認済み（2026-09-30）。
+const OFFICIAL_LINKS: Partial<Record<PrefectureCode, { label: string; provider: string; url: string }[]>> = {
+  "27": [
+    {
+      label: "おおさか防災ネット 避難所検索",
+      provider: "大阪府",
+      url: "https://www.osaka-bousai.net/shelter/index.html",
+    },
+  ],
+  "26": [
+    {
+      label: "府内市町村の指定緊急避難場所、指定避難所情報",
+      provider: "京都府",
+      url: "https://www.pref.kyoto.jp/hinan/index.html",
+    },
+  ],
+  "28": [
+    {
+      label: "指定避難場所等（風水害対策情報ポータルサイト）",
+      provider: "兵庫県",
+      url: "https://www.hazardmap.pref.hyogo.jp/cg-hm/hazard-map/shelter/",
+    },
+  ],
+};
 
 function formatMeters(m: number): string {
   return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
@@ -122,14 +144,14 @@ export default function ShelterDetailContent({
 
       <div className="mt-4">
         <Notice tone="info" title="開設状況は公式情報をご確認ください">
-          この避難所が現在実際に開設されているかは、このアプリでは分かりません。大阪市・大阪府等の公式情報をご確認ください。
+          この避難所が現在実際に開設されているかは、このアプリでは分かりません。市区町村・都道府県等の公式情報をご確認ください。
         </Notice>
       </div>
 
       <section className="mt-4">
         <h4 className="text-sm font-bold text-[var(--color-text-primary)]">公式情報</h4>
         <ul className="mt-1.5 space-y-2">
-          {OFFICIAL_LINKS.map((link) => (
+          {(OFFICIAL_LINKS[shelter.prefectureCode] ?? []).map((link) => (
             <li key={link.url}>
               <a
                 href={link.url}
@@ -150,7 +172,7 @@ export default function ShelterDetailContent({
       </Button>
 
       <p className="mt-3 text-xs leading-relaxed text-[var(--color-text-muted)]">
-        このアプリの表示は避難先を検討するための参考情報です。実際の開設状況や避難情報は、大阪市・大阪府等の公式情報をご確認ください。
+        このアプリの表示は避難先を検討するための参考情報です。実際の開設状況や避難情報は、市区町村・都道府県等の公式情報をご確認ください。
       </p>
     </div>
   );

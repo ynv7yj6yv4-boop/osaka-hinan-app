@@ -25,12 +25,13 @@ export type RegionCapability = {
   elevation: CapabilityStatus;
 };
 
-// Phase 3で大阪府全域（43市町村）の避難所データを実装済み（lib/shelter/
-// provider.ts・osakaProvider.ts・public/data/osaka-prefecture-shelters.json
-// 参照。実際に43市町村すべてで公式データの個別レコード存在を確認済み）。
-// 大阪府（27）以外の府県は、この段階ではまだ避難所データを持たないため
-// "unsupported"（他県のデータを誤って流用しない）。
-const SHELTER_SUPPORTED_PREFECTURE_CODES: readonly string[] = ["27"];
+// Phase 3で大阪府全域（43市町村）、Phase 4で京都府全域（26市町村）・
+// 兵庫県全域（41市町村）の避難所データを実装済み（lib/shelter/provider.ts・
+// osaka/kyoto/hyogoProvider.ts・public/data/{osaka,kyoto,hyogo}-prefecture-
+// shelters.json参照。いずれも全市町村で公式データの個別レコード存在を
+// 確認済み）。滋賀県・奈良県・和歌山県は、この段階ではまだ避難所データを
+// 持たないため"unsupported"（他県のデータを誤って流用しない）。
+const SHELTER_SUPPORTED_PREFECTURE_CODES: readonly string[] = ["26", "27", "28"];
 
 /**
  * 指定した地域で、各機能が現時点で「使ってよい」状態かどうかを返す。
@@ -47,9 +48,10 @@ const SHELTER_SUPPORTED_PREFECTURE_CODES: readonly string[] = ["27"];
  *   スポットチェックで実データ取得を確認済みのため、一律 "supported"。
  * - inlandFlood（内水浸水想定区域）: 都道府県ごとに提供状況が大きく異なる
  *   ため、getInlandFloodAvailability()に判断を委譲する（詳細は同ファイル）。
- * - shelter（避難所データ）: Phase 3で大阪府（27）全域に対応（43市町村分の
- *   国土地理院データを取得・確認済み。scripts/build-shelters.mjs参照）。
- *   大阪府以外の府県は、市区町村が判定できていてもいなくても
+ * - shelter（避難所データ）: Phase 3で大阪府（27）、Phase 4で京都府（26）・
+ *   兵庫県（28）全域に対応（各府県すべての市町村分の国土地理院データを
+ *   取得・確認済み。scripts/build-shelters.mjs参照）。それ以外の府県
+ *   （滋賀・奈良・和歌山）は、市区町村が判定できていてもいなくても
  *   "unsupported"（他県データの誤流用を避けるため、既定は常に非対応）。
  */
 export function getRegionCapability(region: Region): RegionCapability {

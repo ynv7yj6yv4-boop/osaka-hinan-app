@@ -23,7 +23,7 @@
 //   考慮される。
 
 import { getShelters } from "./shelter/provider.ts";
-import type { Region } from "./region/types.ts";
+import type { PrefectureCode, Region } from "./region/types.ts";
 import type { Shelter } from "./shelter/types.ts";
 
 export type ShelterFeature = {
@@ -56,6 +56,9 @@ export type FloodShelterCandidate = {
   availableHours: string | null;
   ward: string | null;
   category: string | null;
+  /** Phase 4: 候補の都道府県コード。複数府県に対応したため、UI側で
+   *  府県ごとの公式リンク出し分け等に使う（例: ShelterDetailContent.tsx）。 */
+  prefectureCode: PrefectureCode;
 };
 
 // 候補として表示する件数。卒論の検証等で変更しやすいよう定数化している。
@@ -133,6 +136,7 @@ export function selectFloodCandidates(
     availableHours: s.availableHours ?? null,
     ward: s.ward ?? null,
     category: s.category ?? null,
+    prefectureCode: s.prefectureCode,
   }));
 
   withDistance.sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters);

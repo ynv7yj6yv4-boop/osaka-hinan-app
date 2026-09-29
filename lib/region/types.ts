@@ -24,6 +24,21 @@ export const PREFECTURE_NAMES: Record<PrefectureCode, string> = {
 };
 
 /**
+ * 都道府県コード→英字slug（ファイル名・URL等に使う）。
+ * Phase 4: scripts/build-shelters.mjs（出力ファイル名の決定）と
+ * lib/shelter/*Provider.ts（JSONのfetch先URL）の両方で、同じ対応表を
+ * 二重管理しないよう、ここに一元化する。
+ */
+export const PREFECTURE_SLUGS: Record<PrefectureCode, string> = {
+  "25": "shiga",
+  "26": "kyoto",
+  "27": "osaka",
+  "28": "hyogo",
+  "29": "nara",
+  "30": "wakayama",
+};
+
+/**
  * JIS X 0402 全国地方公共団体コード（5桁、先頭ゼロを保持するため文字列）。
  * 例:"27100"（大阪市）。今回のPhaseでは境界データを保有する市区町村のみ
  * 解決できる（未保有の市区町村では省略され、都道府県までの判定にとどまる）。
