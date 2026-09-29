@@ -18,12 +18,23 @@ test("大阪市(27100)は避難所・洪水・標高・降雨がsupported、内�
   assert.equal(capability.inlandFlood, "supported");
 });
 
-test("大阪府内でも大阪市以外（堺市想定）は避難所がunsupported（大阪市データを誤って流用しない）", () => {
+test("Phase 3: 大阪府内なら大阪市以外（堺市）も避難所がsupported（大阪府全域データに対応）", () => {
   const region: Region = {
     prefectureCode: "27",
     prefectureName: "大阪府",
     municipalityCode: "27140",
     municipalityName: "堺市",
+  };
+  const capability = getRegionCapability(region);
+  assert.equal(capability.shelter, "supported");
+});
+
+test("大阪府外（京都府想定）は市区町村が判定できていても避難所がunsupported（大阪府データを誤って流用しない）", () => {
+  const region: Region = {
+    prefectureCode: "26",
+    prefectureName: "京都府",
+    municipalityCode: "26100",
+    municipalityName: "京都市",
   };
   const capability = getRegionCapability(region);
   assert.equal(capability.shelter, "unsupported");

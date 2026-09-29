@@ -25,9 +25,12 @@ export type RegionCapability = {
   elevation: CapabilityStatus;
 };
 
-// 今回のPhaseで避難所データを実装済みなのは大阪市（27100）のみ。
-// 他の市区町村は「未対応」として扱う（大阪市データを誤って流用しない）。
-const SHELTER_SUPPORTED_MUNICIPALITY_CODES: readonly string[] = ["27100"];
+// Phase 3で大阪府全域（43市町村）の避難所データを実装済み（lib/shelter/
+// provider.ts・osakaProvider.ts・public/data/osaka-prefecture-shelters.json
+// 参照。実際に43市町村すべてで公式データの個別レコード存在を確認済み）。
+// 大阪府（27）以外の府県は、この段階ではまだ避難所データを持たないため
+// "unsupported"（他県のデータを誤って流用しない）。
+const SHELTER_SUPPORTED_PREFECTURE_CODES: readonly string[] = ["27"];
 
 /**
  * 指定した地域で、各機能が現時点で「使ってよい」状態かどうかを返す。
@@ -44,21 +47,17 @@ const SHELTER_SUPPORTED_MUNICIPALITY_CODES: readonly string[] = ["27100"];
  *   スポットチェックで実データ取得を確認済みのため、一律 "supported"。
  * - inlandFlood（内水浸水想定区域）: 都道府県ごとに提供状況が大きく異なる
  *   ため、getInlandFloodAvailability()に判断を委譲する（詳細は同ファイル）。
- * - shelter（避難所データ）: 今回のPhaseでは大阪市（27100）のみ実装済み。
- *   それ以外の市区町村は市区町村コードを解決できていてもいなくても
- *   "unsupported"（大阪市データの誤流用を避けるため、既定は常に非対応）。
+ * - shelter（避難所データ）: Phase 3で大阪府（27）全域に対応（43市町村分の
+ *   国土地理院データを取得・確認済み。scripts/build-shelters.mjs参照）。
+ *   大阪府以外の府県は、市区町村が判定できていてもいなくても
+ *   "unsupported"（他県データの誤流用を避けるため、既定は常に非対応）。
  */
 export function getRegionCapability(region: Region): RegionCapability {
   return {
     flood: "supported",
     inlandFlood: getInlandFloodAvailability(region.prefectureCode),
-    shelter: isShelterSupportedMunicipality(region.municipalityCode) ? "supported" : "unsupported",
+    shelter: SHELTER_SUPPORTED_PREFECTURE_CODES.includes(region.prefectureCode) ? "supported" : "unsupported",
     rainfall: "supported",
     elevation: "supported",
   };
-}
-
-function isShelterSupportedMunicipality(municipalityCode: string | undefined): boolean {
-  if (!municipalityCode) return false;
-  return SHELTER_SUPPORTED_MUNICIPALITY_CODES.includes(municipalityCode);
 }

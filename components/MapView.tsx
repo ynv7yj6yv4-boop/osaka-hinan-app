@@ -27,7 +27,7 @@ import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
 import { recordRiskHistoryEntry, type RecordRiskHistoryResult } from "@/lib/riskHistory";
 import { checkRegion } from "@/lib/region/checkRegion";
 import { getRegionCapability } from "@/lib/region/capability";
-import type { RegionCheckResult } from "@/lib/region/types";
+import type { RegionCheckResult, Region } from "@/lib/region/types";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import type { FloodShelterCandidate } from "@/lib/floodShelterCandidates";
 import type { RouteRiskSegment } from "@/lib/routeSegmentRisk";
@@ -82,6 +82,13 @@ function getInundationTileUrlForRegion(regionCheck: RegionCheckResult | null): s
   const availability = getRegionCapability(regionCheck.region).inlandFlood;
   if (availability === "unsupported") return null;
   return getInundationTileUrl(regionCheck.region.prefectureCode);
+}
+
+/** Phase 3（地域拡張）: regionCheckから、避難所Provider（lib/shelter/provider.ts）
+ *  等が必要とするRegionを取り出す。地域が判定できていない場合はnull。 */
+function getRegion(regionCheck: RegionCheckResult | null): Region | null {
+  if (!regionCheck || regionCheck.status !== "supported") return null;
+  return regionCheck.region;
 }
 
 type LatLng = { lat: number; lng: number };
@@ -362,7 +369,7 @@ export default function MapView() {
           />
         )}
 
-        <ShelterLayer activeHazard={activeHazard} />
+        <ShelterLayer activeHazard={activeHazard} region={getRegion(regionCheck)} />
 
         {/* ナビ中はNavTrackerが専用の追跡マーカーを描画するため、
             一発取得の現在地マーカーとの重複表示を避ける。 */}
@@ -686,6 +693,7 @@ export default function MapView() {
       {showEvacuationPanel && position && (
         <EvacuationPanel
           position={position}
+          region={getRegion(regionCheck)}
           shelterAvailability={
             regionCheck?.status === "supported"
               ? getRegionCapability(regionCheck.region).shelter

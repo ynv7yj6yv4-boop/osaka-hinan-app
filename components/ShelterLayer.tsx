@@ -8,7 +8,11 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import type { HazardKey } from "./hazardLayers";
 import { toHazardLabels } from "./hazardLayers";
+import { getShelters } from "@/lib/shelter/provider";
+import type { Shelter } from "@/lib/shelter/types";
+import type { Region } from "@/lib/region/types";
 
+// マーカー表示用に必要な最小限の形（避難所詳細ロジックはここでは扱わない）。
 type ShelterFeature = {
   id: string;
   type: "shelter" | "evacuation_site";
@@ -21,13 +25,19 @@ type ShelterFeature = {
   availableHours?: string | null;
 };
 
-type SheltersData = {
-  source: string;
-  sourceUrl: string;
-  fetchedAt: string;
-  notice: string;
-  features: ShelterFeature[];
-};
+function toShelterFeature(s: Shelter): ShelterFeature {
+  return {
+    id: s.id,
+    type: s.shelterType === "designated_shelter" ? "shelter" : "evacuation_site",
+    name: s.name,
+    address: s.address ?? "",
+    lat: s.lat,
+    lng: s.lng,
+    hazards: s.hazards as HazardKey[],
+    telephone: s.telephone,
+    availableHours: s.availableHours,
+  };
+}
 
 // 種類・対応状況ごとにアイコン（色だけに頼らず絵文字でも区別する）
 function makeIcon(kind: "shelter" | "safe" | "other") {
@@ -55,33 +65,45 @@ function hazardLabelText(hazards: HazardKey[]): string {
   return labels.join("・");
 }
 
-export default function ShelterLayer({ activeHazard }: { activeHazard: HazardKey | null }) {
+export default function ShelterLayer({
+  activeHazard,
+  region,
+}: {
+  activeHazard: HazardKey | null;
+  /** Phase 3（地域拡張）: 現在地の地域（lib/region/checkRegion.ts参照）。
+   *  避難所データを提供しているProvider（lib/shelter/provider.ts）が
+   *  存在する都道府県の場合のみ取得・表示する。nullの場合
+   *  （まだ現在地を取得していない等）も表示しない
+   *  （現在地が不明な状態で大阪府のデータを既定で表示しない）。 */
+  region: Region | null;
+}) {
   const map = useMap();
-  const [data, setData] = useState<SheltersData | null>(null);
+  // fetchedFeatures: 最後に取得できたデータ（region未対応時もクリアせず
+  // 保持する。再度対応地域に戻った際、キャッシュ経由で即座に復元できるため）。
+  // 実際に描画するのは下記effectiveFeatures（region===nullなら常にnull）。
+  const [fetchedFeatures, setFetchedFeatures] = useState<ShelterFeature[] | null>(null);
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
 
-  // データは初回のみ取得（792KB程度の静的JSON）
   useEffect(() => {
+    if (!region) return; // 未対応地域では取得しない（既存のfetchedFeaturesはそのままでよい。描画側で除外する）
     let cancelled = false;
-    fetch("/data/osaka-shelters.json")
-      .then((res) => res.json())
-      .then((json: SheltersData) => {
-        if (!cancelled) setData(json);
-      })
-      .catch(() => {
-        // 取得失敗時は避難所レイヤーを表示しないだけにする（地図自体は使えるようにする）
-      });
+    getShelters(region).then((result) => {
+      if (cancelled) return;
+      setFetchedFeatures(result.status === "ok" ? result.shelters.map(toShelterFeature) : null);
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [region]);
+
+  const features = region ? fetchedFeatures : null;
 
   useEffect(() => {
-    if (!data) return;
+    if (!features) return;
 
     const group = L.markerClusterGroup({ maxClusterRadius: 60 });
 
-    for (const f of data.features) {
+    for (const f of features) {
       const isMatch = activeHazard !== null && f.hazards.includes(activeHazard);
       const icon = makeIcon(f.type === "shelter" ? "shelter" : isMatch ? "safe" : "other");
 
@@ -111,7 +133,7 @@ export default function ShelterLayer({ activeHazard }: { activeHazard: HazardKey
       map.removeLayer(group);
       clusterGroupRef.current = null;
     };
-  }, [data, activeHazard, map]);
+  }, [features, activeHazard, map]);
 
   return null;
 }

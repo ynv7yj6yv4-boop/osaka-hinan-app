@@ -74,16 +74,21 @@ Phase6では新しい判定ロジックの追加は行わず、Phase3〜5A.3で�
 
 ## 避難所・避難場所データ
 
-- **出典**: 国土地理院 指定緊急避難場所・指定避難所データ（大阪市, 市町村コード27100）
-- **取得元URL**: https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html
-- **取得日**: 2026-09-06
-- **利用規約**: [国土地理院コンテンツ利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html) に加え、`raw/gsi-notice.txt`（ダウンロード時に同梱される「ご利用上の注意」）に従うこと。特に以下の点に注意：
-  - データは最新でない場合がある。最新・詳細は大阪市に確認すること。
-  - 「指定緊急避難場所」と「指定避難所」は別物であり、指定緊急避難場所は災害種別ごとに指定される。
-  - 第三者に提供する場合は、上記の注意事項を正確に伝えること。
-  - → アプリ内の免責表示・データ由来の注記でこれを満たしています。
-- **生データ**: `raw/27100_shitei-kinkyu-hinanbasho.csv`（指定緊急避難場所）, `raw/27100_shitei-hinanjo.csv`（指定避難所）
-- **変換スクリプト**: `../scripts/build-shelters.mjs` → `../public/data/osaka-shelters.json` を生成
+### Phase 3（大阪市→大阪府全域への拡張、2026-09-29）
+
+- **出典**: 国土地理院 指定緊急避難場所・指定避難所データ（大阪府内43市町村すべて）
+- **取得元URL（ダウンロードページ）**: https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html
+- **実際のCSVダウンロードURL（2026-09-29にPlaywrightでダウンロードページのJS(dlFile関数)を解析し確認）**:
+  `https://hinanmap.gsi.go.jp/hinanjocp/defaultFtpData/csv/{市町村コード}_2.csv`（指定緊急避難場所）、
+  `https://hinanmap.gsi.go.jp/hinanjocp/defaultFtpData/csv/{市町村コード}_1.csv`（指定避難所）
+- **取得日**: 2026-09-29
+- **対象市町村**: 大阪府内43市町村すべて（`data/region-boundaries/kinki-municipalities.geojson`のprefectureCode==="27"から動的に取得）。全43市町村について、実際に個別レコードが存在することを確認済み（大阪府全体で8,652件、市町村別では大阪市の4,141件（指定緊急避難場所3,269・指定避難所872）から千早赤阪村の18件まで、市町村により大きく件数が異なる）。
+- **利用規約**: 上記Phase6時点の記載と同じ（`raw/gsi-notice.txt`・国土地理院コンテンツ利用規約）。43市町村すべて同一の全国共通データ仕様（データ項目定義もダウンロードページで確認済み、市町村間で差異なし）。
+- **生データ**: `raw/{市町村コード}_shitei-kinkyu-hinanbasho.csv`（指定緊急避難場所）, `raw/{市町村コード}_shitei-hinanjo.csv`（指定避難所）を43市町村分（86ファイル）
+- **変換スクリプト**: `../scripts/build-shelters.mjs`（大阪市専用から全市町村対応へ一般化） → `../public/data/osaka-prefecture-shelters.json` を生成
+- **共通Shelter型**: `../lib/shelter/types.ts`。`shelterType`（指定緊急避難場所/指定避難所）・`supportedDisasters.flood`（true/false/"unknown"の3状態）等、将来 京都府・兵庫県等へ拡張可能な形に一般化した（詳細は型定義のコメント参照）。
+- **洪水対応(flood)の3状態の判断根拠**: 指定緊急避難場所データの「洪水」列は「該当は1、非該当は無記入」という国土地理院の公式なデータ項目定義があるため、無記入を明示的な"false"（非該当という行政判断）として扱う。指定避難所データには災害種別の列自体が存在しないため、常に"unknown"とする（「対応していない」と断定できる情報が無いため）。
+- **旧・大阪市専用データとの関係**: `raw/27100_shitei-*.csv`・`../public/data/osaka-shelters.json`（大阪市のみ、Phase6時点）は削除せず、移行中の比較検証用として残している。`../scripts/build-shelters.mjs`はもうこのファイルを生成しない。
 
 ### 避難所詳細情報の補完（電話番号・避難可能時間・区名・分類）
 

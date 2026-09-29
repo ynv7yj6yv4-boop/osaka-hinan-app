@@ -6,6 +6,7 @@ import {
   type FloodShelterCandidate,
 } from "@/lib/floodShelterCandidates";
 import type { CapabilityStatus } from "@/lib/region/capability";
+import type { Region } from "@/lib/region/types";
 import { fetchWalkingRoutes, type WalkingRoute } from "@/lib/evacuationRoute";
 import {
   evaluateRouteFloodHazard,
@@ -76,6 +77,7 @@ const VIEW_TITLE: Record<View, string> = {
 
 export default function EvacuationPanel({
   position,
+  region,
   shelterAvailability,
   inundationTileUrl,
   onClose,
@@ -83,8 +85,12 @@ export default function EvacuationPanel({
   onStartNavigation,
 }: {
   position: LatLng;
+  /** Phase 3（地域拡張）: 避難所Provider（lib/shelter/provider.ts）が
+   *  都道府県を解決するために必要。shelterAvailabilityが"supported"の場合は
+   *  必ず非nullになる（MapView.tsx側で同じregionCheckから導出している）。 */
+  region: Region | null;
   /** 地域判定基盤（Phase 2）: 現在地の避難所データ対応状況（lib/region/capability.ts参照）。
-   *  "supported"以外（大阪市以外の地域等）では、大阪市の避難所データを誤って
+   *  "supported"以外（大阪府外の地域等）では、避難所データを誤って
    *  流用せず、「準備中」であることを案内する（データ取得自体を行わない）。 */
   shelterAvailability: CapabilityStatus;
   /** 2026-09-30の方針・訂正版: 内水氾濫データが確認できる地域でのみ、
@@ -108,12 +114,12 @@ export default function EvacuationPanel({
 }) {
   const [view, setView] = useState<View>("candidates");
 
-  // 地域判定基盤（Phase 2）: 現在地が避難所データ対応地域でない場合（大阪市以外等）。
+  // 地域判定基盤（Phase 2/3）: 現在地が避難所データ対応地域でない場合（大阪府外等）。
   // shelterAvailabilityはpropsであり、このパネルが開いている間に変化しない
   // 前提のため、stateではなく素の派生値として扱う（不要なeffect/setStateを避ける）。
   // candidatesError（取得失敗）とは意味が異なるため別のNoticeにする
   // （「準備中」を「エラー」のように見せない）。
-  const candidatesUnsupported = shelterAvailability !== "supported";
+  const candidatesUnsupported = shelterAvailability !== "supported" || region === null;
 
   const [candidates, setCandidates] = useState<FloodShelterCandidate[] | null>(null);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
@@ -154,20 +160,23 @@ export default function EvacuationPanel({
     // candidatesLoadingはuseState(true)で既に初期値trueであり、このeffectは
     // マウント時に一度だけ実行される(依存配列は空)ため、ここで改めて
     // setCandidatesLoading(true)を呼ぶ必要はない(常にno-opだった)。
-    // 地域判定基盤（Phase 2）: この地域の避難所データがまだ無い場合
-    // （大阪市以外等）、大阪市の避難所データ(/data/osaka-shelters.json)を
-    // 誤って取得・表示しない。取得自体を行わない
-    // （candidatesUnsupportedは上でcandidatesLoadingの初期値にも反映済み）。
-    if (candidatesUnsupported) return;
+    // 地域判定基盤（Phase 2/3）: この地域の避難所データがまだ無い場合
+    // （大阪府外等）、大阪府の避難所データを誤って取得・表示しない。
+    // 取得自体を行わない（candidatesUnsupportedは上でcandidatesLoadingの
+    // 初期値にも反映済み。region===nullの場合もここでreturnするため、
+    // 以降のfindFloodShelterCandidates呼び出し時点でregionは必ず非null）。
+    if (candidatesUnsupported || region === null) return;
 
     let cancelled = false;
-    findFloodShelterCandidates(position).then((result) => {
+    findFloodShelterCandidates(position, region).then((result) => {
       if (cancelled) return;
       setCandidatesLoading(false);
       if (result.status === "fetch_error") {
         setCandidatesError("避難場所データを取得できませんでした。通信環境をご確認ください。");
+      } else if (result.status === "unsupported") {
+        setCandidatesError("この地域の避難場所データは現在準備中です。");
       } else if (result.candidates.length === 0) {
-        setCandidatesError("近くに大阪市指定の洪水対応避難場所が見つかりませんでした。");
+        setCandidatesError("現在のデータでは、洪水対応の避難先候補を確認できませんでした。");
       } else {
         setCandidates(result.candidates);
       }
@@ -311,7 +320,7 @@ export default function EvacuationPanel({
       {view === "candidates" && (
         <div>
           <p className="text-xs leading-relaxed text-[var(--color-text-muted)]">
-            大阪市が洪水時の指定緊急避難場所として指定している施設のうち、現在地から近い順に表示しています（直線距離）。
+            自治体が洪水時の指定緊急避難場所として指定している施設のうち、現在地から近い順に表示しています（直線距離）。
           </p>
           {candidatesLoading && (
             <p className="mt-4 flex items-center gap-2 text-[var(--color-text-secondary)]">
@@ -325,7 +334,7 @@ export default function EvacuationPanel({
           {candidatesUnsupported && (
             <div className="mt-4">
               <Notice tone="info" title="この地域の避難所データは現在準備中です">
-                現在の対応地域は大阪市のみです。それ以外の地域では、避難先候補を表示できません。
+                現在の対応地域は大阪府のみです。それ以外の地域では、避難先候補を表示できません。
               </Notice>
             </div>
           )}
@@ -343,7 +352,7 @@ export default function EvacuationPanel({
                 <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
                   直線距離：約{formatMeters(c.straightLineDistanceMeters)}
                 </div>
-                <div className="mt-1 text-sm text-[var(--color-info)]">大阪市の洪水対応指定あり</div>
+                <div className="mt-1 text-sm text-[var(--color-info)]">自治体の洪水対応指定あり</div>
                 {toHazardLabels(c.hazards).length > 0 && (
                   <ul className="mt-1.5 flex flex-wrap gap-1">
                     {toHazardLabels(c.hazards).map((label) => (
@@ -573,7 +582,7 @@ export default function EvacuationPanel({
           <section className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3">
             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">データについて</h3>
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
-              大阪市の洪水対応指定：あり（国土地理院データ）
+              自治体の洪水対応指定：あり（国土地理院データ）
               <br />
               使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域
               {inundationTileUrl ? "・内水氾濫浸水想定区域" : ""}）
