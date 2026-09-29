@@ -9,7 +9,7 @@ import { useAuth, useClerk } from "@clerk/nextjs";
 import Button from "../ui/Button";
 import Notice from "../ui/Notice";
 import { APP_NAME, APP_TARGET_AREA_LABEL } from "@/lib/appInfo";
-import { AUTH_LOADING_TIMEOUT_MS, resendCooldownRemainingSeconds } from "@/lib/auth/authConfig";
+import { AUTH_LOADING_TIMEOUT_MS, EMAIL_LANGUAGE_NOTE, resendCooldownRemainingSeconds } from "@/lib/auth/authConfig";
 import { NETWORK_ERROR_MESSAGE } from "@/lib/auth/authErrorMessages";
 
 /** 認証画面の外枠。stepKeyが変わるたびに見出しへフォーカスを移す
@@ -95,6 +95,16 @@ export function AuthError({ message, id }: { message: string | null; id: string 
         </p>
       )}
     </div>
+  );
+}
+
+/** 確認コード入力画面の補足（Clerkから英語のメールで届くこと・迷惑メールフォルダ）。 */
+export function EmailCodeNote() {
+  return (
+    <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
+      {EMAIL_LANGUAGE_NOTE}
+      メールが届かない場合は、迷惑メールフォルダもご確認ください。
+    </p>
   );
 }
 

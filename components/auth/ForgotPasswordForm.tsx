@@ -19,6 +19,7 @@ import {
   AuthReadyGate,
   AuthShell,
   CodeField,
+  EmailCodeNote,
   EmailField,
   PasswordField,
   ResendCodeButton,
@@ -124,8 +125,9 @@ export default function ForgotPasswordForm({ passwordRequirementText }: { passwo
       <AuthShell title="再設定コードを入力" stepKey="code">
         <p className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
           <span className="break-all font-bold text-[var(--color-text-primary)]">{emailAddress.trim()}</span>
-          {" "}に再設定コードを送信しました。メールに記載された6桁の数字を入力してください。
+          {" "}に再設定コードを送信しました。
         </p>
+        <EmailCodeNote />
         <form onSubmit={handleVerifyCode} noValidate>
           <CodeField value={code} onChange={setCode} describedBy="reset-error" />
           <AuthError id="reset-error" message={error} />

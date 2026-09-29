@@ -19,6 +19,7 @@ import {
   AuthReadyGate,
   AuthShell,
   CodeField,
+  EmailCodeNote,
   EmailField,
   PasswordField,
   ResendCodeButton,
@@ -103,8 +104,9 @@ export default function SignInForm() {
     return (
       <AuthShell title="本人確認のコードを入力" stepKey="client-trust">
         <p className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          いつもと異なる端末・ブラウザからのログインのため、登録メールアドレスに確認コードを送信しました。メールに記載された6桁の数字を入力してください。
+          いつもと異なる端末・ブラウザからのログインのため、登録メールアドレスに確認コードを送信しました。
         </p>
+        <EmailCodeNote />
         <form onSubmit={handleVerifyTrust} noValidate>
           <CodeField value={code} onChange={setCode} describedBy="signin-error" />
           <AuthError id="signin-error" message={error} />

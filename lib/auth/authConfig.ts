@@ -32,5 +32,13 @@ export const AUTH_LOADING_TIMEOUT_MS = 10000;
  */
 export const SIGN_UP_START_TIMEOUT_MS = 30000;
 
+/**
+ * 確認コード入力画面に添える案内。確認コード・再設定コードのメールはClerkが
+ * 送信し、文面は英語のまま（メールテンプレートの日本語化はClerkの有料プランの
+ * 機能のため、現時点では行っていない）。英語のメールで戸惑わないよう案内する。
+ */
+export const EMAIL_LANGUAGE_NOTE =
+  "確認コードのメールは英語で届きます。メール内に記載された6桁の数字を入力してください。";
+
 /** ログイン・登録完了後の移動先（避難支援マップ）。 */
 export const AFTER_AUTH_PATH = "/";

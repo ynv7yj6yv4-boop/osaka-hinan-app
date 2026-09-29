@@ -20,6 +20,7 @@ import {
   AuthReadyGate,
   AuthShell,
   CodeField,
+  EmailCodeNote,
   EmailField,
   PasswordField,
   ResendCodeButton,
@@ -147,11 +148,9 @@ export default function SignUpForm({ passwordRequirementText }: { passwordRequir
       <AuthShell title="メールを確認してください" stepKey="verify">
         <p className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
           <span className="break-all font-bold text-[var(--color-text-primary)]">{signUp.emailAddress ?? emailAddress}</span>
-          {" "}に確認コードを送信しました。メールに記載された6桁の数字を入力してください。
+          {" "}に確認コードを送信しました。
         </p>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
-          メールが届かない場合は、迷惑メールフォルダもご確認ください。
-        </p>
+        <EmailCodeNote />
         <form onSubmit={handleVerify} noValidate>
           <CodeField value={code} onChange={setCode} describedBy="signup-error" />
           <AuthError id="signup-error" message={error} />
