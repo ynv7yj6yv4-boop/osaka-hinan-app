@@ -436,6 +436,16 @@ export default function MapView() {
         />
       ) : (
         <>
+      {/* Phase 7: 横向き（パソコンのブラウザを含む）ではヘッダーを非表示にしているため、
+          アカウントメニュー（ログアウト）の入口を地図の右上に小さく浮かせて表示する。
+          縦向きではヘッダー内のアイコンを使うので、こちらは表示しない。 */}
+      <div
+        className="pointer-events-auto absolute z-[1000] hidden [@media(orientation:landscape)]:block"
+        style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
+      >
+        <AccountMenu variant="floating" />
+      </div>
+
       {/* ==== 前面レイヤー：地図の上に重ねる情報 ====
           親には pointer-events-none を指定し、地図のドラッグ・ピンチ操作を
           遮らないようにする。実際に操作可能な各カード側で pointer-events-auto を

@@ -12,7 +12,12 @@ import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import { AccountIcon } from "./ui/icons";
 
-export default function AccountMenu() {
+/**
+ * variant:
+ * - "header"（既定）: 縦向きのヘッダー内に、情報アイコンと同じ大きさで並べる
+ * - "floating": 横向き（ヘッダー非表示）のとき、地図の上に単独で浮かせる丸いボタン
+ */
+export default function AccountMenu({ variant = "header" }: { variant?: "header" | "floating" }) {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +56,13 @@ export default function AccountMenu() {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-label="アカウントメニューを開く"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)]"
+        className={
+          variant === "floating"
+            ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/95 text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)]"
+            : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)]"
+        }
       >
-        <AccountIcon className="h-5 w-5" />
+        <AccountIcon className={variant === "floating" ? "h-6 w-6" : "h-5 w-5"} />
       </button>
       {open && (
         <Modal title="アカウント" onClose={() => setOpen(false)}>
