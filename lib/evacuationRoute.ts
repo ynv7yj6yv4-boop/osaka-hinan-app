@@ -19,6 +19,7 @@
 // streetName・distanceMeters から独自に組み立てる。
 
 import type { LatLng } from "./routeHazardEvaluation";
+import { fetchWithSession, SESSION_EXPIRED_MESSAGE } from "./auth/fetchWithSession";
 
 /** openrouteserviceのstep 1件（区間ごとの案内情報）。 */
 export type RouteStep = {
@@ -53,7 +54,9 @@ export type RouteFetchErrorReason =
   | "upstream_error"
   | "network_error"
   | "invalid_response"
-  | "no_route";
+  | "no_route"
+  // Phase 7: ログイン（Clerkセッション）を確認できなかった（API Routeが401を返した）
+  | "session_expired";
 
 const KNOWN_SERVER_REASONS: readonly RouteFetchErrorReason[] = [
   "api_key_missing",
@@ -78,7 +81,7 @@ export async function fetchWalkingRoutes(
 ): Promise<RouteFetchResult> {
   let res: Response;
   try {
-    res = await fetch("/api/evacuation-route", {
+    res = await fetchWithSession("/api/evacuation-route", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ origin, destination }),
@@ -93,6 +96,10 @@ export async function fetchWalkingRoutes(
   }
 
   const data = await res.json().catch(() => null);
+
+  if (res.status === 401) {
+    return { status: "error", message: SESSION_EXPIRED_MESSAGE, reason: "session_expired" };
+  }
 
   if (!res.ok || !data) {
     const reason: RouteFetchErrorReason = isKnownServerReason(data?.reason)

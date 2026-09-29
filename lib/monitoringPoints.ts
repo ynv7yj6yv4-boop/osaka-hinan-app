@@ -18,6 +18,8 @@
 // 平文でそのまま送信している値であり、ここで新たに機密性の高い情報を
 // 増やすものではない）。
 
+import { fetchWithSession } from "./auth/fetchWithSession";
+
 const STORAGE_KEY = "osaka-hinan-app:monitoringPointId";
 const STORAGE_KEY_TOKEN = "osaka-hinan-app:monitoringPointToken";
 
@@ -78,7 +80,7 @@ export async function registerMonitoringPoint(params: {
   fcmToken: string;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
-    const res = await fetch("/api/monitoring-points", {
+    const res = await fetchWithSession("/api/monitoring-points", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -109,7 +111,7 @@ export async function registerMonitoringPoint(params: {
  */
 export async function fetchMonitoringPoint(id: string, fcmToken: string): Promise<MonitoringPointInfo | null> {
   try {
-    const res = await fetch(`/api/monitoring-points/${id}`, {
+    const res = await fetchWithSession(`/api/monitoring-points/${id}`, {
       headers: { "x-fcm-token": fcmToken },
     });
     if (!res.ok) return null;
@@ -121,7 +123,7 @@ export async function fetchMonitoringPoint(id: string, fcmToken: string): Promis
 
 export async function deleteMonitoringPoint(id: string, fcmToken: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/monitoring-points/${id}`, {
+    const res = await fetchWithSession(`/api/monitoring-points/${id}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fcmToken }),
@@ -142,7 +144,7 @@ export async function setMonitoringPointEnabled(
   enabled: boolean
 ): Promise<boolean> {
   try {
-    const res = await fetch(`/api/monitoring-points/${id}`, {
+    const res = await fetchWithSession(`/api/monitoring-points/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fcmToken, notificationEnabled: enabled }),

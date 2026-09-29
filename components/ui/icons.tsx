@@ -116,3 +116,14 @@ export function LayersIcon({ className, style }: IconProps) {
     </svg>
   );
 }
+
+// Phase 7: アカウントメニューを開くボタン用。
+export function AccountIcon({ className, style }: IconProps) {
+  return (
+    <svg {...common} className={className} style={style}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="10" r="3" />
+      <path d="M6.2 18.2a6.5 6.5 0 0 1 11.6 0" />
+    </svg>
+  );
+}

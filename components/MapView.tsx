@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
 import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
 import CandidateMarkers from "./CandidateMarkers";
+import AccountMenu from "./AccountMenu";
 import RiskCard from "./RiskCard";
 import DisasterInfoCard from "./DisasterInfoCard";
 import RiskDetailModal from "./RiskDetailModal";
@@ -483,16 +484,21 @@ export default function MapView() {
                   参考情報・{APP_TARGET_AREA_LABEL}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAreaInfo((v) => !v)}
-                aria-expanded={showAreaInfo}
-                aria-controls="app-info-detail"
-                aria-label="このアプリについての注意書きを開く"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)]"
-              >
-                <InfoIcon className="h-5 w-5" />
-              </button>
+              {/* Phase 7: アカウントメニュー（ログアウト等）。情報アイコンと同じ大きさの
+                  アイコンを並べるだけにし、ヘッダーの高さ・地図の表示面積は変えない。 */}
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAreaInfo((v) => !v)}
+                  aria-expanded={showAreaInfo}
+                  aria-controls="app-info-detail"
+                  aria-label="このアプリについての注意書きを開く"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)]"
+                >
+                  <InfoIcon className="h-5 w-5" />
+                </button>
+                <AccountMenu />
+              </div>
             </div>
             {showAreaInfo && (
               <p

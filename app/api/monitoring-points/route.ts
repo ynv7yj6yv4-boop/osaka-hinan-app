@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 
 // 試作3時点の研究対象。要件定義書2 §5・§35の「高潮を評価対象外とする方針」、
 // および2026-09-30の「内水氾濫を対象災害から除外する」方針に合わせる。
@@ -19,6 +20,10 @@ import { getAdminFirestore } from "@/lib/firebaseAdmin";
 const ALLOWED_HAZARDS = ["flood"] as const;
 
 export async function POST(request: Request) {
+  // Phase 7: ログイン利用者のみ（lib/auth/routeAccess.ts参照）。
+  const authResult = await requireApiAuth();
+  if (!authResult.ok) return authResult.response;
+
   let body: unknown;
   try {
     body = await request.json();

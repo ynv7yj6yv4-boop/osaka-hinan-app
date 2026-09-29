@@ -21,6 +21,10 @@ import { APP_NAME } from "@/lib/appInfo";
 
 const FIREBASE_JS_SDK_VERSION = "12.18.0";
 
+// Phase 7: オフライン時にページを開いた場合の案内（Service Workerが返す）。
+// 外部リソースに依存しない最小限のHTML。
+const OFFLINE_PAGE_HTML = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${APP_NAME}</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#f7f8fa;color:#1a1d21;display:flex;justify-content:center;padding:32px 16px}main{max-width:420px;width:100%;background:#fff;border:1px solid #d9dde3;border-radius:16px;padding:20px}h1{font-size:20px;margin:0 0 8px}p{font-size:15px;line-height:1.7;color:#4a5058}button{margin-top:16px;width:100%;min-height:48px;border:0;border-radius:12px;background:#1d4ed8;color:#fff;font-size:16px;font-weight:700}</style></head><body><main><p style="margin:0;font-weight:700;color:#1a1d21">${APP_NAME}</p><h1>認証状態を確認できません</h1><p>インターネットに接続できないため、ログイン状態を確認できません。通信環境をご確認のうえ、再読み込みしてください。</p><p>災害時は、自治体・気象庁等の公式情報や防災行政無線もあわせてご確認ください。</p><button onclick="location.reload()">再読み込み</button></main></body></html>`;
+
 export async function GET() {
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
@@ -34,8 +38,14 @@ export async function GET() {
 
   const cachingLogic = `
 // ---- オフライン時の簡易キャッシュ(既存機能。PART B-3参照) ----
-const CACHE_NAME = "osaka-hinan-app-v1";
+// Phase 7: v1→v2。認証導入前にキャッシュされたページ(HTML)を破棄するため。
+const CACHE_NAME = "osaka-hinan-app-v2";
 const NEVER_CACHE_PREFIXES = ["/api/"];
+
+// Phase 7: ページ遷移（HTML）はキャッシュしない。サーバーが埋め込むClerkの
+// 認証状態を端末内に残さないため、またログアウト後に以前の画面を表示しないため。
+// 通信できない場合は、ログイン失敗ではなく通信障害であることが分かる画面を返す。
+const OFFLINE_HTML = ${JSON.stringify(OFFLINE_PAGE_HTML)};
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -49,8 +59,11 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
-function shouldSkipCache(url) {
+function shouldSkipCache(url, request) {
   if (url.origin !== self.location.origin) return true;
+  // Phase 7: Next.jsのクライアント遷移用のサーバーコンポーネント応答（RSC）も
+  // ページと同様に認証状態を含みうるため、キャッシュしない。
+  if (url.searchParams.has("_rsc") || request.headers.get("RSC") === "1") return true;
   return NEVER_CACHE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
 }
 
@@ -58,7 +71,18 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (shouldSkipCache(url)) return;
+  if (shouldSkipCache(url, request)) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        return await fetch(request);
+      } catch {
+        return new Response(OFFLINE_HTML, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
+      }
+    })());
+    return;
+  }
 
   event.respondWith((async () => {
     try {

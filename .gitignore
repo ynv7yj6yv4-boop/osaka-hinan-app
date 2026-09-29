@@ -46,3 +46,6 @@ next-env.d.ts
 # scripts/build-region-boundaries.mjs が実行のたびに再取得するため、
 # 最終成果物(data/region-boundaries/*.geojson)のみをコミット対象とする。
 data/raw/n03-source/
+
+# Phase 7: Clerk keylessモードの一時キー（秘密値を含むためGit管理しない）
+.clerk/

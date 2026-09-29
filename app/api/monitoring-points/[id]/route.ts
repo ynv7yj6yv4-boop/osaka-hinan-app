@@ -13,6 +13,7 @@
 
 import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 
 type MonitoringPointDoc = {
   latitude: number;
@@ -46,6 +47,9 @@ async function verifyOwnership(
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  // Phase 7: ログイン利用者のみ（lib/auth/routeAccess.ts参照）。
+  const authResult = await requireApiAuth();
+  if (!authResult.ok) return authResult.response;
   const { id } = await context.params;
   const fcmToken = request.headers.get("x-fcm-token");
 
@@ -80,6 +84,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  // Phase 7: ログイン利用者のみ（lib/auth/routeAccess.ts参照）。
+  const authResult = await requireApiAuth();
+  if (!authResult.ok) return authResult.response;
   const { id } = await context.params;
   let body: unknown;
   try {
@@ -103,6 +110,9 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  // Phase 7: ログイン利用者のみ（lib/auth/routeAccess.ts参照）。
+  const authResult = await requireApiAuth();
+  if (!authResult.ok) return authResult.response;
   const { id } = await context.params;
   let body: unknown;
   try {

@@ -13,6 +13,7 @@
 // エンドポイント・APIキーの扱い・取得ロジック自体は変更していない。
 
 import { NextResponse } from "next/server";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 
 // 2026年時点の正式エンドポイント（api.heigit.org）。
 // 古い api.openrouteservice.org は使用しない（ユーザーとの合意事項）。
@@ -48,6 +49,10 @@ function logRouteError(reason: RouteErrorReason, detail?: Record<string, unknown
 }
 
 export async function POST(request: Request) {
+  // Phase 7: ログイン利用者のみ（lib/auth/routeAccess.ts参照）。
+  const authResult = await requireApiAuth();
+  if (!authResult.ok) return authResult.response;
+
   const apiKey = process.env.OPENROUTESERVICE_API_KEY;
   if (!apiKey) {
     logRouteError("api_key_missing");

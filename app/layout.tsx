@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import DevNotificationTester from "@/components/DevNotificationTester";
 import { APP_NAME, APP_SHORT_NAME, APP_DESCRIPTION } from "@/lib/appInfo";
@@ -39,11 +40,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ja" className={`${notoSansJP.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <ServiceWorkerRegister />
-        {children}
-        {/* 試作3 PART C-3・H: 開発者専用。NEXT_PUBLIC_ENABLE_DEV_TOOLS=1の
-            場合のみ表示（一般ユーザーには表示されない）。 */}
-        {process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "1" && <DevNotificationTester />}
+        {/* Phase 7: Clerk公式仕様どおり、ClerkProviderは<html>ではなく<body>の内側に置く。
+            Service Worker登録・開発者ツールも含め、既存の子要素はそのまま内側に入れる。 */}
+        <ClerkProvider>
+          <ServiceWorkerRegister />
+          {children}
+          {/* 試作3 PART C-3・H: 開発者専用。NEXT_PUBLIC_ENABLE_DEV_TOOLS=1の
+              場合のみ表示（一般ユーザーには表示されない）。 */}
+          {process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "1" && <DevNotificationTester />}
+        </ClerkProvider>
       </body>
     </html>
   );

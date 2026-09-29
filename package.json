@@ -12,6 +12,7 @@
     "shelters:build:kinki": "node scripts/build-shelters.mjs 25 && node scripts/build-shelters.mjs 26 && node scripts/build-shelters.mjs 27 && node scripts/build-shelters.mjs 28 && node scripts/build-shelters.mjs 29 && node scripts/build-shelters.mjs 30"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.8",
     "@turf/boolean-point-in-polygon": "^7.4.0",
     "@turf/buffer": "^7.4.0",
     "@turf/helpers": "^7.4.0",

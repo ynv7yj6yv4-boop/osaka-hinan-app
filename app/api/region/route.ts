@@ -11,8 +11,13 @@ import { NextResponse } from "next/server";
 import { loadRegionBoundaries } from "@/lib/region/loadBoundaries";
 import { lookupRegion } from "@/lib/region/regionLookup";
 import type { RegionCheckResult } from "@/lib/region/types";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 
 export async function GET(request: Request) {
+  // Phase 7: ログイン利用者のみ（lib/auth/routeAccess.ts参照）。
+  const authResult = await requireApiAuth();
+  if (!authResult.ok) return authResult.response;
+
   const { searchParams } = new URL(request.url);
   const latParam = searchParams.get("lat");
   const lngParam = searchParams.get("lng");
