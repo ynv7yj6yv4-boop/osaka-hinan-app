@@ -76,10 +76,17 @@ const outPath = path.join(__dirname, "..", "public", "data", `${slug}-prefecture
 // 対象市町村一覧（指定した都道府県内、lib/regionの境界データから取得）
 // ============================================================
 
+// 【重要・Phase 5で発見】末尾000の市町村コード（例: 和歌山県の
+// "30000 所属未定地"）はscripts/fetch-shelter-source-data.mjsと同じ理由で
+// 除外する（実在の市町村ではなく、GSI側では偶然その都道府県の集約データが
+// 返るため。詳細は同スクリプトのコメント参照）。除外しないと、この集約
+// データが重複除去処理で「正」として扱われ、実際の市町村コードを持つ
+// レコードが誤って除去される。
 const boundaries = JSON.parse(readFileSync(boundaryPath, "utf-8"));
 const targetMunicipalities = boundaries.features
   .map((f) => f.properties)
   .filter((p) => p.prefectureCode === PREFECTURE_CODE)
+  .filter((p) => !p.municipalityCode.endsWith("000"))
   .map((p) => ({ code: p.municipalityCode, name: p.municipalityName }))
   .sort((a, b) => a.code.localeCompare(b.code));
 

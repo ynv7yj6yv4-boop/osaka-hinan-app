@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test lib/*.test.ts lib/*/*.test.ts"
+    "test": "node --test lib/*.test.ts lib/*/*.test.ts",
+    "shelters:fetch:kinki": "node scripts/fetch-shelter-source-data.mjs 25 && node scripts/fetch-shelter-source-data.mjs 26 && node scripts/fetch-shelter-source-data.mjs 27 && node scripts/fetch-shelter-source-data.mjs 28 && node scripts/fetch-shelter-source-data.mjs 29 && node scripts/fetch-shelter-source-data.mjs 30",
+    "shelters:build:kinki": "node scripts/build-shelters.mjs 25 && node scripts/build-shelters.mjs 26 && node scripts/build-shelters.mjs 27 && node scripts/build-shelters.mjs 28 && node scripts/build-shelters.mjs 29 && node scripts/build-shelters.mjs 30"
   },
   "dependencies": {
     "@turf/boolean-point-in-polygon": "^7.4.0",

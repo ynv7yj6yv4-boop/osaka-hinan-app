@@ -40,10 +40,23 @@ const boundaryPath = path.join(
 
 const prefectureCode = process.argv[2] ?? "27";
 
+// 【重要・Phase 5で発見】市町村コードが「000」で終わる境界データ
+// （例: 和歌山県の"30000 所属未定地"）は、実在する市町村ではなく
+// 行政区域が未確定な土地を表すN03の特殊カテゴリであり、実際に個別の
+// 避難所指定を持つ主体ではない。かつ、この"30000"はGSIのCSV配信URL
+// (defaultFtpData/csv/30000_2.csv 等)では偶然、和歌山県内の全市町村分を
+// 束ねた集約データが返ってくることを実際に確認した（他の都道府県では
+// この末尾000のコードは境界データに存在しない）。これを通常の市町村と
+// 同様に個別取得すると、共通IDが重複した集約データと個別市町村データが
+// 混在し、後段のbuild-shelters.mjsでの重複除去処理が「集約データ側を
+// 正」として個別市町村のmunicipalityCode（正しい市町村コード）を
+// 持つレコードを誤って除去してしまう（実際に和歌山県で確認・修正した
+// 不具合）。そのため、末尾000の市町村コードは取得対象から除外する。
 const boundaries = JSON.parse(readFileSync(boundaryPath, "utf-8"));
 const municipalities = boundaries.features
   .map((f) => f.properties)
   .filter((p) => p.prefectureCode === prefectureCode)
+  .filter((p) => !p.municipalityCode.endsWith("000"))
   .map((p) => ({ code: p.municipalityCode, name: p.municipalityName }))
   .sort((a, b) => a.code.localeCompare(b.code));
 

@@ -6,22 +6,25 @@
 // UI層は`getShelters(region)`を呼ぶだけでよく、Providerを追加する際も
 // UI層の変更は不要（このファイルへの登録のみで済む）。
 //
-// 【Phase 4で京都府・兵庫県を追加】大阪府（27）に加え、京都府（26）・
-// 兵庫県（28）にもProviderを登録した。いずれも実体は
+// 【Phase 4で京都府・兵庫県、Phase 5で滋賀県・奈良県・和歌山県を追加】
+// これで近畿2府4県すべて（25〜30）にProviderが登録された。いずれも実体は
 // createJsonShelterProvider()（jsonShelterProvider.ts）で、都道府県ごとに
 // 独立したJSON（例: /data/kyoto-prefecture-shelters.json）をfetchする
 // （1つの巨大JSONに統合しない。京都府の利用者が大阪府・兵庫県の
 // データまでダウンロードしないようにするため）。
 //
-// 【滋賀県・奈良県・和歌山県は今回未対応】Providerを登録せず、
+// 【三重県等、近畿2府4県の外は今回も未対応】Providerを登録せず、
 // "unsupported"を返す（他県のデータを誤って流用しない。既存の
 // RegionCapabilityと同じ安全側の考え方）。
 
 import type { PrefectureCode, Region } from "../region/types.ts";
 import type { Shelter } from "./types.ts";
-import { osakaShelterProvider } from "./osakaProvider.ts";
+import { shigaShelterProvider } from "./shigaProvider.ts";
 import { kyotoShelterProvider } from "./kyotoProvider.ts";
+import { osakaShelterProvider } from "./osakaProvider.ts";
 import { hyogoShelterProvider } from "./hyogoProvider.ts";
+import { naraShelterProvider } from "./naraProvider.ts";
+import { wakayamaShelterProvider } from "./wakayamaProvider.ts";
 
 export type GetSheltersResult =
   | { status: "ok"; shelters: Shelter[] }
@@ -33,9 +36,12 @@ export type ShelterProvider = {
 };
 
 const PROVIDERS: Partial<Record<PrefectureCode, ShelterProvider>> = {
+  "25": shigaShelterProvider,
   "26": kyotoShelterProvider,
   "27": osakaShelterProvider,
   "28": hyogoShelterProvider,
+  "29": naraShelterProvider,
+  "30": wakayamaShelterProvider,
 };
 
 /**

@@ -18,17 +18,17 @@ import { toHazardLabels } from "./hazardLayers";
 import Button from "./ui/Button";
 import Notice from "./ui/Notice";
 
-// Phase 4: 公式リンクは候補の都道府県ごとに出し分ける（大阪府の候補に
-// 京都府のリンクを出す、といった誤りを避けるため）。大阪府・京都府・
-// 兵庫県のみ登録（避難所Providerが対応している都道府県と一致させる）。
-// 各リンクは実際にアクセスし、都道府県公式の避難所情報ページであることを
-// 確認済み（2026-09-30）。
+// Phase 4/5: 公式リンクは候補の都道府県ごとに出し分ける（大阪府の候補に
+// 京都府のリンクを出す、といった誤りを避けるため）。近畿2府4県すべてを
+// 登録済み（避難所Providerが対応している都道府県と一致させる）。
+// 各リンクは実際にアクセスし、都道府県公式の避難所・防災情報ページで
+// あることを確認済み（2026-09-30・Phase 4／2026-10-01・Phase 5）。
 const OFFICIAL_LINKS: Partial<Record<PrefectureCode, { label: string; provider: string; url: string }[]>> = {
-  "27": [
+  "25": [
     {
-      label: "おおさか防災ネット 避難所検索",
-      provider: "大阪府",
-      url: "https://www.osaka-bousai.net/shelter/index.html",
+      label: "滋賀県防災ポータル",
+      provider: "滋賀県",
+      url: "https://dis-shiga.jp/pc/evacuation/info.html",
     },
   ],
   "26": [
@@ -38,11 +38,32 @@ const OFFICIAL_LINKS: Partial<Record<PrefectureCode, { label: string; provider: 
       url: "https://www.pref.kyoto.jp/hinan/index.html",
     },
   ],
+  "27": [
+    {
+      label: "おおさか防災ネット 避難所検索",
+      provider: "大阪府",
+      url: "https://www.osaka-bousai.net/shelter/index.html",
+    },
+  ],
   "28": [
     {
       label: "指定避難場所等（風水害対策情報ポータルサイト）",
       provider: "兵庫県",
       url: "https://www.hazardmap.pref.hyogo.jp/cg-hm/hazard-map/shelter/",
+    },
+  ],
+  "29": [
+    {
+      label: "奈良県防災ポータル",
+      provider: "奈良県",
+      url: "https://www.bosai.pref.nara.jp/dis_portal/",
+    },
+  ],
+  "30": [
+    {
+      label: "避難場所・避難所について",
+      provider: "和歌山県",
+      url: "https://www.pref.wakayama.lg.jp/prefg/011400/hinannsaki.html",
     },
   ],
 };

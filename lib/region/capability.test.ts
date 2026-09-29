@@ -65,26 +65,38 @@ test("Phase 4: 京都府・兵庫県内でも県庁所在地以外（宇治市�
   assert.equal(getRegionCapability(himeji).shelter, "supported");
 });
 
-test("滋賀県・奈良県・和歌山県（未対応府県）は市区町村が判定できていても避難所がunsupported（他県データを誤って流用しない）", () => {
-  const shiga: Region = {
+test("Phase 5: 滋賀県・奈良県・和歌山県も避難所がsupported（近畿2府4県すべて対応）", () => {
+  const otsu: Region = {
     prefectureCode: "25",
     prefectureName: "滋賀県",
     municipalityCode: "25201",
     municipalityName: "大津市",
   };
-  assert.equal(getRegionCapability(shiga).shelter, "unsupported");
+  assert.equal(getRegionCapability(otsu).shelter, "supported");
 
-  const nara: Region = { prefectureCode: "29", prefectureName: "奈良県" };
-  assert.equal(getRegionCapability(nara).shelter, "unsupported");
+  const nara: Region = {
+    prefectureCode: "29",
+    prefectureName: "奈良県",
+    municipalityCode: "29201",
+    municipalityName: "奈良市",
+  };
+  assert.equal(getRegionCapability(nara).shelter, "supported");
 
-  const wakayama: Region = { prefectureCode: "30", prefectureName: "和歌山県" };
-  assert.equal(getRegionCapability(wakayama).shelter, "unsupported");
+  const wakayama: Region = {
+    prefectureCode: "30",
+    prefectureName: "和歌山県",
+    municipalityCode: "30201",
+    municipalityName: "和歌山市",
+  };
+  assert.equal(getRegionCapability(wakayama).shelter, "supported");
 });
 
-test("未対応府県は市区町村が判定できていない場合も避難所はunsupported（安全側）", () => {
+test("近畿2府4県すべてで、市区町村が判定できていない場合も避難所はsupported（都道府県単位の判定のため）", () => {
   const region: Region = { prefectureCode: "29", prefectureName: "奈良県" };
   const capability = getRegionCapability(region);
-  assert.equal(capability.shelter, "unsupported");
+  assert.equal(capability.shelter, "supported");
+  // inlandFloodは避難所とは独立した判定基準であり、奈良県は引き続きunsupportedのまま
+  // （Phase 2の訂正方針を維持。避難所対応拡大とは無関係）。
   assert.equal(capability.inlandFlood, "unsupported");
 });
 
