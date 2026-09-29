@@ -12,6 +12,11 @@ import { getInlandFloodAvailability } from "./inlandFloodAvailability.ts";
 
 export type CapabilityStatus = "supported" | "unsupported" | "unknown";
 
+// 【重要・2026-09-30の方針・訂正版】内水氾濫は「データが確認できない
+// 地域」でのみ評価を省略する。データが存在する可能性がある地域では、
+// 他の項目（flood・shelter・rainfall・elevation）と同様にinlandFloodも
+// 通常のCapabilityStatusとして扱い、UI表示・対応可否判定に使用してよい
+// （例: MapView.tsxの「一部機能は準備中」の判定にもinlandFloodを含める）。
 export type RegionCapability = {
   flood: CapabilityStatus;
   inlandFlood: CapabilityStatus;

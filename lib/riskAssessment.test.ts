@@ -7,6 +7,12 @@
 // - 404等(unknown)は「区域外」「低リスク」とみなさない
 // - Phase3時点では🔴(evacuate)は使用しない(スコアが高くても🟠が上限)
 //
+// 【2026-09-30の方針・訂正版】内水氾濫は「データが確認できない地域」でのみ
+// 評価を省略する。buildRiskResult()は省略時 hazardKeys=["flood"]（洪水のみ）
+// で動作するため、以下の大半のテストは明示的にhazardKeysを渡さず洪水のみを
+// 検証している。内水氾濫を含む場合（hazardKeys=["flood","inundation"]）の
+// 挙動は、末尾の「複数ハザード(洪水+内水氾濫)」セクションで別途検証する。
+//
 // buildRiskResult()はassessRisk()からネットワークI/Oを除いた純粋関数
 // (依存性注入)のため、実際のタイル取得を行わずに判定ロジックだけを検証できる。
 
@@ -19,7 +25,6 @@ import type { RainfallObservationResult } from "./rainfallObservation.ts";
 
 const OUTSIDE: HazardPixelStatus = { status: "outside" };
 const HAZARD_RANK_1: HazardPixelStatus = { status: "hazard", rank: 1 };
-const HAZARD_RANK_3: HazardPixelStatus = { status: "hazard", rank: 3 };
 const UNKNOWN_NO_TILE: HazardPixelStatus = { status: "unknown", reason: "no_tile" };
 const UNKNOWN_FETCH_ERROR: HazardPixelStatus = { status: "unknown", reason: "fetch_error" };
 const UNKNOWN_COLOR: HazardPixelStatus = { status: "unknown", reason: "color_unknown" };
@@ -36,10 +41,10 @@ const OBSERVED_HEAVY_RAINFALL: RainfallObservationResult = {
 
 const BASE = { lat: 34.6937, lng: 135.5023, elevation: NO_ELEVATION, rainfall: NO_RAINFALL };
 
-// --- 洪水リスクあり / 内水氾濫リスクあり / 両方 / リスクなし ---
+// --- 洪水リスクあり / なし ---
 
-test("洪水のみhazard(区域内)なら level=prepare または caution になり、洪水の情報が反映される", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1, OUTSIDE] });
+test("洪水がhazard(区域内)なら level=prepare または caution になり、洪水の情報が反映される", () => {
+  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1] });
   assert.equal(result.score, 1);
   assert.equal(result.level, "caution");
   assert.equal(result.assessmentCompleteness, "complete");
@@ -48,52 +53,32 @@ test("洪水のみhazard(区域内)なら level=prepare または caution にな
   assert.match(flood!.detail, /浸水想定区域内/);
 });
 
-test("内水氾濫のみhazard(区域内)なら内水氾濫の情報が反映される", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE, HAZARD_RANK_1] });
-  const inundation = result.factors.find((f) => f.key === "inundation");
-  assert.equal(inundation?.available, true);
-  assert.match(inundation!.detail, /浸水想定区域内/);
-  assert.equal(result.score, 1);
-});
-
-test("洪水・内水氾濫の両方がhazardなら、スコアはより高い方(maxRank)が採用される", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1, HAZARD_RANK_3] });
-  assert.equal(result.score, 3);
-  assert.equal(result.level, "prepare");
-  assert.equal(result.assessmentCompleteness, "complete");
-});
-
-test("両方ともoutside(区域外)ならリスクなし(safe)、スコア0", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE, OUTSIDE] });
+test("洪水がoutside(区域外)ならリスクなし(safe)、スコア0", () => {
+  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE] });
   assert.equal(result.score, 0);
   assert.equal(result.level, "safe");
   assert.equal(result.assessmentCompleteness, "complete");
 });
 
+test("hazardKeysを省略すると洪水のみが評価対象になり、factorsに内水氾濫のキーは含まれない", () => {
+  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1] });
+  const inundation = result.factors.find((f) => f.key === "inundation");
+  assert.equal(inundation, undefined);
+});
+
 // --- ハザード情報が取得できない場合 ---
 
-test("両方ともunknownなら assessmentCompleteness=unavailable, level=unknown(safeにはしない)", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_NO_TILE, UNKNOWN_FETCH_ERROR] });
+test("unknownなら assessmentCompleteness=unavailable, level=unknown(safeにはしない)", () => {
+  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_NO_TILE] });
   assert.equal(result.assessmentCompleteness, "unavailable");
   assert.equal(result.level, "unknown");
   assert.equal(result.score, 0);
 });
 
-test("片方がunknownでもpartialとなり、判定できた方の情報でlevelを決める(unknownで既知リスクを引き下げない)", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_3, UNKNOWN_NO_TILE] });
-  assert.equal(result.assessmentCompleteness, "partial");
-  assert.equal(result.score, 3);
-  assert.equal(result.level, "prepare");
-  assert.ok(
-    result.disclaimers.some((d) => d.includes("一部について")),
-    "partial時は一部確認できなかった旨のdisclaimerが追加される"
-  );
-});
-
 // --- 404等をunknownとして扱う既存仕様(区域外・低リスクへの変換禁止) ---
 
 test("no_tile(404相当)はunknownのまま保持され、outsideや低リスクへ変換されない", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_NO_TILE, UNKNOWN_NO_TILE] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_NO_TILE] });
   const flood = result.factors.find((f) => f.key === "flood");
   assert.equal(flood?.status, "unknown");
   assert.equal(flood?.reason, "no_tile");
@@ -105,14 +90,14 @@ test("no_tile(404相当)はunknownのまま保持され、outsideや低リスク
 // --- API/タイル取得エラー ---
 
 test("fetch_error理由のunknownも同様にunknownとして扱われる(理由の違いで結果を変えない)", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_FETCH_ERROR, UNKNOWN_FETCH_ERROR] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_FETCH_ERROR] });
   assert.equal(result.assessmentCompleteness, "unavailable");
   assert.equal(result.level, "unknown");
 });
 
-test("color_unknown理由のunknownも同様に扱われる", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_COLOR, OUTSIDE] });
-  assert.equal(result.assessmentCompleteness, "partial");
+test("color_unknown理由のunknownも同様にunavailableとして扱われる", () => {
+  const result = buildRiskResult({ ...BASE, hazardPixels: [UNKNOWN_COLOR] });
+  assert.equal(result.assessmentCompleteness, "unavailable");
   const flood = result.factors.find((f) => f.key === "flood");
   assert.equal(flood?.reason, "color_unknown");
 });
@@ -120,20 +105,20 @@ test("color_unknown理由のunknownも同様に扱われる", () => {
 // --- 境界値・RiskLevel判定ロジック(scoreToLevel相当) ---
 
 test("境界値: score=0はsafe", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE, OUTSIDE] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE] });
   assert.equal(result.score, 0);
   assert.equal(result.level, "safe");
 });
 
 test("境界値: score=1(ちょうど)はcaution", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1, OUTSIDE] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1] });
   assert.equal(result.score, 1);
   assert.equal(result.level, "caution");
 });
 
 test("境界値: score=2以上はすべてprepare(rank=5でも🔴evacuateにはならない)", () => {
   const rank5: HazardPixelStatus = { status: "hazard", rank: 5 };
-  const result = buildRiskResult({ ...BASE, hazardPixels: [rank5, OUTSIDE] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [rank5] });
   assert.equal(result.score, 5);
   assert.equal(result.level, "prepare");
   assert.notEqual(result.level, "evacuate");
@@ -144,7 +129,7 @@ test("現時点の仕様ではevacuate(🔴)には一切到達しない(rank/rai
   const result = buildRiskResult({
     lat: 34.6937,
     lng: 135.5023,
-    hazardPixels: [rank5, rank5],
+    hazardPixels: [rank5],
     elevation: NO_ELEVATION,
     rainfall: OBSERVED_HEAVY_RAINFALL, // 猛烈な雨(rank8)でも
   });
@@ -158,27 +143,27 @@ test("降雨実況が「観測あり・猛烈な雨」でも、静的ハザー�
   const withHeavyRain = buildRiskResult({
     lat: 34.6937,
     lng: 135.5023,
-    hazardPixels: [OUTSIDE, OUTSIDE],
+    hazardPixels: [OUTSIDE],
     elevation: NO_ELEVATION,
     rainfall: OBSERVED_HEAVY_RAINFALL,
   });
-  const withoutRain = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE, OUTSIDE] });
+  const withoutRain = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE] });
   assert.equal(withHeavyRain.level, withoutRain.level);
   assert.equal(withHeavyRain.score, withoutRain.score);
   assert.equal(withHeavyRain.level, "safe");
 });
 
 test("降雨実況の取得失敗(fetch_error)でも、静的ハザード判定(score/level)には一切影響しない", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_3, OUTSIDE], rainfall: NO_RAINFALL });
-  assert.equal(result.score, 3);
-  assert.equal(result.level, "prepare");
+  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1], rainfall: NO_RAINFALL });
+  assert.equal(result.score, 1);
+  assert.equal(result.level, "caution");
   const rainfallFactor = result.factors.find((f) => f.key === "rainfall");
   assert.equal(rainfallFactor?.available, false);
   assert.equal(rainfallFactor?.score, 0, "rainfallのRiskFactor.scoreは常に0(総合スコアに寄与しない)");
 });
 
 test("降雨実況が観測できても、そのRiskFactor.scoreは常に0(反映しない既存仕様)", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE, OUTSIDE], rainfall: OBSERVED_HEAVY_RAINFALL });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE], rainfall: OBSERVED_HEAVY_RAINFALL });
   const rainfallFactor = result.factors.find((f) => f.key === "rainfall");
   assert.equal(rainfallFactor?.available, true);
   assert.equal(rainfallFactor?.score, 0);
@@ -189,10 +174,10 @@ test("降雨実況が観測できても、そのRiskFactor.scoreは常に0(反�
 test("標高が取得できてもできなくても、score/levelには影響しない", () => {
   const withElevation = buildRiskResult({
     ...BASE,
-    hazardPixels: [HAZARD_RANK_1, OUTSIDE],
+    hazardPixels: [HAZARD_RANK_1],
     elevation: { available: true, elevation: 3.4, source: "5m" },
   });
-  const withoutElevation = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1, OUTSIDE] });
+  const withoutElevation = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1] });
   assert.equal(withElevation.score, withoutElevation.score);
   assert.equal(withElevation.level, withoutElevation.level);
 });
@@ -200,7 +185,7 @@ test("標高が取得できてもできなくても、score/levelには影響し
 // --- その他の既存仕様の確認 ---
 
 test("judgmentLogのruleVersion・positionが結果に含まれる(研究再現性のためのログ)", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1, OUTSIDE] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [HAZARD_RANK_1] });
   assert.equal(result.judgmentLog.position.lat, BASE.lat);
   assert.equal(result.judgmentLog.position.lng, BASE.lng);
   assert.ok(result.judgmentLog.ruleVersion.length > 0);
@@ -209,14 +194,69 @@ test("judgmentLogのruleVersion・positionが結果に含まれる(研究再現�
 test("generatedAtを指定すればその値がそのまま使われる(再現性のための依存性注入)", () => {
   const result = buildRiskResult({
     ...BASE,
-    hazardPixels: [OUTSIDE, OUTSIDE],
+    hazardPixels: [OUTSIDE],
     generatedAt: "2026-09-10T00:00:00.000Z",
   });
   assert.equal(result.generatedAt, "2026-09-10T00:00:00.000Z");
 });
 
 test("disclaimersには常に基本の2件が含まれる(公式情報ではない旨・降雨未反映の旨)", () => {
-  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE, OUTSIDE] });
+  const result = buildRiskResult({ ...BASE, hazardPixels: [OUTSIDE] });
   assert.ok(result.disclaimers.some((d) => d.includes("公式の避難情報ではありません")));
   assert.ok(result.disclaimers.some((d) => d.includes("反映していません")));
+});
+
+// --- 複数ハザード(洪水+内水氾濫)。内水氾濫データが確認できる地域
+//     （lib/region/inlandFloodAvailability.tsで"unsupported"以外）では、
+//     MapView.tsxがhazardKeys=["flood","inundation"]を渡す想定。 ---
+
+test("内水氾濫のみhazard(区域内)なら内水氾濫の情報が反映される", () => {
+  const result = buildRiskResult({
+    ...BASE,
+    hazardPixels: [OUTSIDE, HAZARD_RANK_1],
+    hazardKeys: ["flood", "inundation"],
+  });
+  const inundation = result.factors.find((f) => f.key === "inundation");
+  assert.equal(inundation?.available, true);
+  assert.match(inundation!.detail, /浸水想定区域内/);
+  assert.equal(result.score, 1);
+});
+
+test("洪水・内水氾濫の両方がhazardなら、スコアはより高い方(maxRank)が採用される", () => {
+  const rank3: HazardPixelStatus = { status: "hazard", rank: 3 };
+  const result = buildRiskResult({
+    ...BASE,
+    hazardPixels: [HAZARD_RANK_1, rank3],
+    hazardKeys: ["flood", "inundation"],
+  });
+  assert.equal(result.score, 3);
+  assert.equal(result.level, "prepare");
+  assert.equal(result.assessmentCompleteness, "complete");
+});
+
+test("片方がunknownでもpartialとなり、判定できた方の情報でlevelを決める(unknownで既知リスクを引き下げない)", () => {
+  const rank3: HazardPixelStatus = { status: "hazard", rank: 3 };
+  const result = buildRiskResult({
+    ...BASE,
+    hazardPixels: [rank3, UNKNOWN_NO_TILE],
+    hazardKeys: ["flood", "inundation"],
+  });
+  assert.equal(result.assessmentCompleteness, "partial");
+  assert.equal(result.score, 3);
+  assert.equal(result.level, "prepare");
+  assert.ok(
+    result.disclaimers.some((d) => d.includes("一部")),
+    "partial時は一部確認できなかった旨のdisclaimerが追加される"
+  );
+});
+
+test("両方ともunknownならassessmentCompleteness=unavailable, level=unknown", () => {
+  const result = buildRiskResult({
+    ...BASE,
+    hazardPixels: [UNKNOWN_NO_TILE, UNKNOWN_FETCH_ERROR],
+    hazardKeys: ["flood", "inundation"],
+  });
+  assert.equal(result.assessmentCompleteness, "unavailable");
+  assert.equal(result.level, "unknown");
+  assert.equal(result.score, 0);
 });

@@ -7,20 +7,23 @@ import Modal from "./ui/Modal";
 import Notice from "./ui/Notice";
 
 // 内部の英語表現(complete/partial/unavailable)を、一般ユーザー向けの日本語に変換する。
-// 試作2: 高潮を研究対象から除外したため、対象ハザードは洪水・内水氾濫の2つ
-// （lib/riskAssessment.ts の hazardKeys と対応させる）。
+// 【2026-09-30の方針・訂正版】内水氾濫は「データが確認できない地域」でのみ
+// 評価を省略する（除外は全地域一律ではない）。そのため対象ハザード数は
+// 地域によって1件（洪水のみ）または2件（洪水・内水氾濫）と変化する
+// （lib/riskAssessment.ts の assessRisk()・hazardKeys 参照）。ここでは
+// 特定のハザード名を挙げず、件数に依存しない文言にしている。
 const COMPLETENESS_TEXT: Record<RiskResult["assessmentCompleteness"], { label: string; detail: string }> = {
   complete: {
-    label: "すべて確認できました",
-    detail: "洪水・内水氾濫のすべてについて、ハザード情報を確認できました。",
+    label: "確認できました",
+    detail: "ハザード情報を確認できました。",
   },
   partial: {
     label: "一部確認できていません",
-    detail: "洪水・内水氾濫の一部について、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。",
+    detail: "一部のハザードについて、ハザード情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。",
   },
   unavailable: {
     label: "確認できませんでした",
-    detail: "洪水・内水氾濫のいずれについても、ハザード情報を確認できませんでした。",
+    detail: "ハザード情報を確認できませんでした。",
   },
 };
 

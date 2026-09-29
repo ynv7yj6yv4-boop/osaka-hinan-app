@@ -5,22 +5,26 @@
 // 【重要・このモジュールの位置づけ】
 // - 既存の lib/routeHazardEvaluation.ts (評価結果を集計するだけの
 //   evaluateRouteFloodHazard())は変更しない。ここでは、その内部で実際に
-//   ピクセル単位の判定を行っている classifyHazardPixel() を、洪水・内水氾濫
-//   の両方について再利用する(内水氾濫はこれまでルート評価に使われて
-//   いなかったが、lib/riskAssessment.ts が現在地判定で全く同じ関数・
-//   タイルURL・凡例を使って内水氾濫を判定できることを確認済みのため、
-//   ここでも安全に再利用できる)。
+//   ピクセル単位の判定を行っている classifyHazardPixel() を再利用する。
 // - 標高(地形)はlib/gsiElevationTile.ts・lib/routeTerrainEvaluation.tsに委譲。
 // - 「安全」「必ず冠水する」という断定は行わない。統合結果はあくまで
 //   参考区間評価(relatively_low/attention/higher_attention/unknown)。
 //
+// 【2026-09-30の方針・訂正版】内水氾濫は「データが確認できない地域」でのみ
+// 評価を省略する。データが存在する可能性がある地域では引き続き洪水と
+// 併せて評価する。evaluateRouteSegmentRisk()のinundationTileUrl引数が
+// undefined/nullの場合のみ、内水氾濫タイルへのリクエストを一切行わない
+// （lib/riskAssessment.ts の assessRisk() と同じ設計）。
+//
 // 【安全側の統合方針】
 // - unknownは決して「低リスク」として扱わない。
 // - terrain(地形)だけでは最高リスク(higher_attention)にしない
-//   (洪水・内水のいずれかが高い場合のみhigher_attentionとする)。
-// - 区間が「relatively_low」と言えるのは、洪水・内水氾濫の両方を
-//   実際に評価できた場合のみ。どちらかが評価不能ならunknownとする
-//   (評価できなかった項目があるのに「低リスク」と見せない)。
+//   (洪水・内水氾濫のいずれかが高い場合のみhigher_attentionとする)。
+// - 区間が「relatively_low」と言えるのは、評価対象(スコープ内)の
+//   ハザードすべてを実際に評価できた場合のみ。内水氾濫が今回のスコープ外
+//   （地域非対応）の場合は、洪水が評価できていればよい。評価対象なのに
+//   評価不能な項目があればunknownとする（評価できなかった項目を
+//   安全側に見せない）。
 
 import { HAZARD_TILE_URL } from "../components/hazardLayers.ts";
 import { classifyHazardPixel } from "./hazardPixelClassifier.ts";
@@ -71,8 +75,12 @@ export type RouteRiskSegment = {
   reasons: RouteRiskReason[];
   /** この区間内で確認された最大の洪水ハザードrank(評価できた範囲のみ)。 */
   flood: DepthRankAssessment;
-  /** この区間内で確認された最大の内水氾濫ハザードrank。 */
-  inlandFlood: DepthRankAssessment;
+  /**
+   * この区間内で確認された最大の内水氾濫ハザードrank。
+   * 今回の評価が内水氾濫データの確認できない地域だった場合はnull
+   * （「評価したが分からなかった(unknown)」ではなく「今回は評価対象外」を表す）。
+   */
+  inlandFlood: DepthRankAssessment | null;
   /** この区間内で最も低かった地点の標高(参考値)。 */
   elevationMeters: number | null;
   elevationSource: ElevationSource;
@@ -123,17 +131,25 @@ function combineTerrain(
   };
 }
 
+/**
+ * @param inlandFlood 内水氾濫データが確認できる地域では評価結果
+ *   (DepthRankAssessment)を渡す。データが確認できない地域ではnullを渡す
+ *   （「評価したが分からなかった」ではなく「今回は評価対象外」を表す。
+ *   nullの場合、relatively_low判定は洪水のみで行われる）。
+ */
 export function determineSegmentRisk(
   flood: DepthRankAssessment,
-  inlandFlood: DepthRankAssessment,
+  inlandFlood: DepthRankAssessment | null,
   isRelativelyLowTerrain: boolean
 ): { riskLevel: SegmentRiskLevel; reasons: RouteRiskReason[] } {
   const { attentionDepthRank, higherAttentionDepthRank } = ROUTE_SEGMENT_RISK_CONFIG;
   const floodKnown = flood.status === "evaluated";
-  const inlandKnown = inlandFlood.status === "evaluated";
+  const inlandInScope = inlandFlood !== null;
+  const inlandKnown = inlandInScope && inlandFlood.status === "evaluated";
+  const inlandRank = inlandKnown ? (inlandFlood as { status: "evaluated"; rank: DepthRank }).rank : 0;
 
   const floodHigh = floodKnown && flood.rank >= higherAttentionDepthRank;
-  const inlandHigh = inlandKnown && inlandFlood.rank >= higherAttentionDepthRank;
+  const inlandHigh = inlandKnown && inlandRank >= higherAttentionDepthRank;
   if (floodHigh || inlandHigh) {
     const reasons: RouteRiskReason[] = [];
     if (floodHigh) reasons.push("flood_hazard_area");
@@ -142,7 +158,7 @@ export function determineSegmentRisk(
   }
 
   const floodSome = floodKnown && flood.rank >= attentionDepthRank;
-  const inlandSome = inlandKnown && inlandFlood.rank >= attentionDepthRank;
+  const inlandSome = inlandKnown && inlandRank >= attentionDepthRank;
   if (floodSome || inlandSome || isRelativelyLowTerrain) {
     const reasons: RouteRiskReason[] = [];
     if (floodSome) reasons.push("flood_hazard_area");
@@ -152,9 +168,11 @@ export function determineSegmentRisk(
   }
 
   // 明確なハザードは検出されなかった。「低リスク」と表示するには、
-  // 洪水・内水氾濫の両方を実際に評価できている必要がある
+  // 評価対象(スコープ内)のハザードをすべて実際に評価できている必要がある
   // (unknown != relatively_low。評価できなかった項目を安全側に見せない)。
-  if (floodKnown && inlandKnown) {
+  // 内水氾濫が今回のスコープ外(inlandFlood === null、地域非対応)の場合は、
+  // 洪水が評価できていればよい。
+  if (floodKnown && (!inlandInScope || inlandKnown)) {
     return { riskLevel: "relatively_low", reasons: ["no_significant_hazard"] };
   }
   return { riskLevel: "unknown", reasons: ["data_unavailable"] };
@@ -216,7 +234,8 @@ export type SubSegmentAssessment = {
   riskLevel: SegmentRiskLevel;
   reasons: RouteRiskReason[];
   flood: DepthRankAssessment;
-  inlandFlood: DepthRankAssessment;
+  /** nullは「今回のスコープ外(地域非対応)」を表す（RouteRiskSegment.inlandFlood参照）。 */
+  inlandFlood: DepthRankAssessment | null;
   elevationMeters: number | null;
   elevationSource: ElevationSource;
   relativeElevationMeters: number | null;
@@ -238,7 +257,10 @@ export function mergeSubSegments(subSegments: SubSegmentAssessment[], geometry: 
     if (last && last.riskLevel === sub.riskLevel && sameReasons(last.reasons, sub.reasons)) {
       last.endDistanceMeters = sub.endDistanceMeters;
       last.flood = combineDepthRank(last.flood, sub.flood);
-      last.inlandFlood = combineDepthRank(last.inlandFlood, sub.inlandFlood);
+      last.inlandFlood =
+        last.inlandFlood === null || sub.inlandFlood === null
+          ? null
+          : combineDepthRank(last.inlandFlood, sub.inlandFlood);
       const relCandidates = [last.relativeElevationMeters, sub.relativeElevationMeters].filter(
         (v): v is number => v !== null
       );
@@ -276,6 +298,13 @@ export type EvaluateRouteSegmentRiskOptions = {
   demFetchFn?: DemFetchFn;
   /** テスト用。省略時は新規作成する(ルート1本ごとに新しいキャッシュ)。 */
   tileCache?: ElevationTileCache;
+  /**
+   * 内水氾濫データが確認できる地域でのみ、呼び出し元（EvacuationPanel.tsx）が
+   * 該当都道府県用のタイルURL（hazardLayers.tsのgetInundationTileUrl()）を
+   * 渡す。省略/nullの場合は内水氾濫を一切評価しない＝タイルへのリクエスト
+   * 自体を行わない（lib/riskAssessment.tsのassessRisk()と同じ設計）。
+   */
+  inundationTileUrl?: string | null;
 };
 
 /**
@@ -292,6 +321,7 @@ export async function evaluateRouteSegmentRisk(
   const intervalMeters = options.intervalMeters ?? ROUTE_SEGMENT_RISK_CONFIG.sampleIntervalMeters;
   const tileCache = options.tileCache ?? createElevationTileCache();
   const samples: RouteSample[] = sampleRouteAtInterval(geometry, intervalMeters);
+  const inundationTileUrl = options.inundationTileUrl ?? null;
 
   const lookupElevation = (point: LatLng) => getElevationAtPoint(point.lat, point.lng, tileCache, options.demFetchFn);
 
@@ -299,7 +329,7 @@ export async function evaluateRouteSegmentRisk(
     samples.map(async (s) => {
       const [flood, inlandFlood, terrain] = await Promise.all([
         assessHazardAtPoint(HAZARD_TILE_URL.flood, s.point),
-        assessHazardAtPoint(HAZARD_TILE_URL.inundation, s.point),
+        inundationTileUrl ? assessHazardAtPoint(inundationTileUrl, s.point) : Promise.resolve(null),
         evaluateTerrainAtPoint(s.point, lookupElevation),
       ]);
       return { sample: s, flood, inlandFlood, terrain };
@@ -311,7 +341,8 @@ export async function evaluateRouteSegmentRisk(
     const a = perSample[i];
     const b = perSample[i + 1];
     const flood = combineDepthRank(a.flood, b.flood);
-    const inlandFlood = combineDepthRank(a.inlandFlood, b.inlandFlood);
+    const inlandFlood =
+      a.inlandFlood === null || b.inlandFlood === null ? null : combineDepthRank(a.inlandFlood, b.inlandFlood);
     const terrain = combineTerrain(a.terrain, b.terrain);
     const { riskLevel, reasons } = determineSegmentRisk(flood, inlandFlood, terrain.isRelativelyLow);
     subSegments.push({

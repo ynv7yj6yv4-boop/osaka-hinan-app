@@ -5,7 +5,13 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
-import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
+import {
+  HAZARD_BUTTONS,
+  HAZARD_TILE_URL,
+  HAZARD_ATTRIBUTION,
+  getInundationTileUrl,
+  type HazardKey,
+} from "./hazardLayers";
 import RiskCard from "./RiskCard";
 import DisasterInfoCard from "./DisasterInfoCard";
 import RiskDetailModal from "./RiskDetailModal";
@@ -51,15 +57,32 @@ const DEFAULT_ZOOM = 13;
 
 // 試作2（要件定義書2 §5・§32）: 高潮を研究対象から除外したため、
 // ハザード切替UIの選択肢からは高潮を外す。
-// 内水氾濫についても、地図上のハザード表示切替からは選択肢を外す
-// （ユーザー指示）。
-// 【重要】components/hazardLayers.ts のHAZARD_BUTTONS自体（高潮・内水氾濫の
-// タイルURL等）は削除していない。ここではUI表示用に絞り込むだけで、
-// lib/riskAssessment.ts・lib/routeSegmentRisk.ts が使う内水氾濫ハザード
-// データ・判定ロジックには影響しない。
+// 内水氾濫についても、地図上のハザード表示切替（地図に重ねて表示する
+// レイヤー選択）からは選択肢を外す（ユーザー指示）。
+// 【重要】これは地図上に内水氾濫タイルを「重ねて表示する」機能だけの制限。
+// lib/riskAssessment.ts の危険度判定・lib/routeSegmentRisk.ts の
+// ルート区間評価では、内水氾濫データが確認できる地域で内水氾濫を引き続き
+// 評価する（下記getInundationTileUrlForRegion参照。2026-09-30の方針・訂正版）。
 const DISPLAYABLE_HAZARD_BUTTONS = HAZARD_BUTTONS.filter(
   (h) => h.key !== "hightide" && h.key !== "inundation"
 );
+
+/**
+ * 危険度判定・ルート評価で内水氾濫を評価してよいか、してよいならどの
+ * タイルURLを使うかを、地域判定結果から一箇所で決める。
+ * - 地域が判定できていない(supported以外)場合はnull（内水氾濫を評価しない）
+ * - 判定できた都道府県で、内水氾濫データが"unsupported"（確認できない）
+ *   場合もnull
+ * - それ以外（"supported"・"unknown"）の場合は、該当都道府県のタイルURLを返す
+ *   （"unknown"は「データが無いと確定していない」ため、評価を試みる側にする。
+ *   実際にデータが無ければ、classifyHazardPixel側で自然にunknownになる）。
+ */
+function getInundationTileUrlForRegion(regionCheck: RegionCheckResult | null): string | null {
+  if (!regionCheck || regionCheck.status !== "supported") return null;
+  const availability = getRegionCapability(regionCheck.region).inlandFlood;
+  if (availability === "unsupported") return null;
+  return getInundationTileUrl(regionCheck.region.prefectureCode);
+}
 
 type LatLng = { lat: number; lng: number };
 
@@ -248,19 +271,26 @@ export default function MapView() {
         const lng = result.coords.longitude;
         setPosition({ lat, lng });
         setIsLocating(false);
-        checkRegion(lat, lng).then(setRegionCheck);
 
-        // 現在地が取得できたら、続けてその場所の危険度を自動判定する
+        // 危険度判定は、内水氾濫データが確認できる地域かどうかで評価対象
+        // ハザードが変わるため、地域判定の結果を待ってから実行する
+        // （2026-09-30の方針・訂正版。地域判定自体は軽量なサーバー側
+        // Point in Polygon判定のため、体感できるほどの遅延は生じない想定）。
         setIsAssessingRisk(true);
-        assessRisk(lat, lng)
-          .then((result) => {
-            setRiskResult(result);
-            // 研究用・UX改善用: 前回確認時との比較をこの端末内(localStorage)だけで
-            // 記録する。サーバーへは送信せず、失敗してもリスク表示自体は壊れない
-            // (lib/riskHistory.ts参照)。
-            setRiskComparison(recordRiskHistoryEntry(result.level, result.generatedAt));
-          })
-          .finally(() => setIsAssessingRisk(false));
+        checkRegion(lat, lng).then((region) => {
+          setRegionCheck(region);
+          const inundationTileUrl = getInundationTileUrlForRegion(region);
+
+          assessRisk(lat, lng, inundationTileUrl)
+            .then((result) => {
+              setRiskResult(result);
+              // 研究用・UX改善用: 前回確認時との比較をこの端末内(localStorage)だけで
+              // 記録する。サーバーへは送信せず、失敗してもリスク表示自体は壊れない
+              // (lib/riskHistory.ts参照)。
+              setRiskComparison(recordRiskHistoryEntry(result.level, result.generatedAt));
+            })
+            .finally(() => setIsAssessingRisk(false));
+        });
       },
       (error) => {
         setIsLocating(false);
@@ -295,6 +325,10 @@ export default function MapView() {
   // Phase5Aの洪水専用ルート評価ロジックそのものは変更していない。
   // 試作2: 高潮はlib/riskAssessment.tsのRiskLevel算出対象から除外したため、
   // ここでの比較対象も内水氾濫のみとする（riskResult.factorsにも高潮は含まれなくなった）。
+  // 【重要・2026-09-30の方針・訂正版】内水氾濫は、データが確認できない
+  // 地域でのみriskResult.factorsから省かれる（getInundationTileUrlForRegion
+  // 参照）。データが確認できる地域（大阪府等）では引き続き"inundation"
+  // キーが含まれうるため、このフラグは地域によって意味のある判定を行う。
   const floodFactor = riskResult?.factors.find((f) => f.key === "flood");
   const inundationScore = riskResult?.factors.find((f) => f.key === "inundation")?.score ?? 0;
   const floodIsNotThePrimaryHazard = Boolean(
@@ -520,6 +554,9 @@ export default function MapView() {
               {regionCheck.region.municipalityName ?? ""}
               {(() => {
                 const capability = getRegionCapability(regionCheck.region);
+                // 2026-09-30の方針・訂正版: 内水氾濫はデータが確認できない
+                // 地域でのみ評価を省略するため、「一部機能は準備中」の判定材料
+                // としてinlandFloodも含める（他の項目と同様に扱う）。
                 const hasLimitedCapability = Object.values(capability).some((s) => s !== "supported");
                 return hasLimitedCapability ? (
                   <span className="mt-0.5 block text-[var(--color-text-muted)]">
@@ -656,6 +693,7 @@ export default function MapView() {
                 ? "unsupported"
                 : "unknown"
           }
+          inundationTileUrl={getInundationTileUrlForRegion(regionCheck)}
           onClose={() => setShowEvacuationPanel(false)}
           onRoutesChange={setEvacuationRoutes}
           onStartNavigation={handleStartNavigation}

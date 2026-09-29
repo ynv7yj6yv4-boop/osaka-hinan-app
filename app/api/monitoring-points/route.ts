@@ -3,14 +3,20 @@
 // 【重要】保存する情報は最低限にする(PART D-1・D-2)。
 // GPS移動履歴は継続保存せず、ユーザーが明示的に登録した瞬間の
 // 1地点のスナップショットのみを保存する。
-// 高潮は試作2から研究対象外のため、enabledHazardsにも含めない。
+// 高潮は試作2から、内水氾濫は2026-09-30の開発方針更新から研究対象外のため、
+// enabledHazardsにも含めない。
 
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 
-// 試作3時点の研究対象。要件定義書2 §5・§35の「高潮を評価対象外とする方針」に合わせる。
-const ALLOWED_HAZARDS = ["flood", "inundation"] as const;
+// 試作3時点の研究対象。要件定義書2 §5・§35の「高潮を評価対象外とする方針」、
+// および2026-09-30の「内水氾濫を対象災害から除外する」方針に合わせる。
+// 【重要】enabledHazardsは現状functions/側の通知判定では参照されておらず
+// （notificationDecisionConfig.targetHazardが"flood"固定）、登録メタデータの
+// みの意味を持つ。ここで"inundation"を含めないのは、実際には通知判定に
+// 使われていない値をユーザーに誤って提示しないための対応。
+const ALLOWED_HAZARDS = ["flood"] as const;
 
 export async function POST(request: Request) {
   let body: unknown;

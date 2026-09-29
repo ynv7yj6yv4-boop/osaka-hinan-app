@@ -84,7 +84,10 @@ export async function registerMonitoringPoint(params: {
       body: JSON.stringify({
         latitude: params.latitude,
         longitude: params.longitude,
-        enabledHazards: ["flood", "inundation"],
+        // 2026-09-30: 内水氾濫は対象災害から除外されたため、
+        // 登録時のenabledHazardsにも含めない（app/api/monitoring-points/route.ts
+        // のALLOWED_HAZARDS参照）。
+        enabledHazards: ["flood"],
         fcmToken: params.fcmToken,
       }),
     });

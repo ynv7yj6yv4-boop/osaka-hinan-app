@@ -166,7 +166,7 @@ export default function MonitoringPointSection({ position }: { position: { lat: 
           <p className="text-sm text-[var(--color-text-secondary)]">
             登録中：緯度{info.latitude.toFixed(4)}・経度{info.longitude.toFixed(4)}付近
           </p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">対象ハザード：洪水・内水氾濫（高潮は対象外）</p>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">対象ハザード：洪水（高潮・内水氾濫は対象外）</p>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             通知：{info.notificationEnabled ? "受け取る" : "停止中"}
           </p>

@@ -77,6 +77,7 @@ const VIEW_TITLE: Record<View, string> = {
 export default function EvacuationPanel({
   position,
   shelterAvailability,
+  inundationTileUrl,
   onClose,
   onRoutesChange,
   onStartNavigation,
@@ -86,9 +87,13 @@ export default function EvacuationPanel({
    *  "supported"以外（大阪市以外の地域等）では、大阪市の避難所データを誤って
    *  流用せず、「準備中」であることを案内する（データ取得自体を行わない）。 */
   shelterAvailability: CapabilityStatus;
+  /** 2026-09-30の方針・訂正版: 内水氾濫データが確認できる地域でのみ、
+   *  MapView.tsxが該当都道府県のタイルURLを渡す。nullの場合、区間別評価
+   *  （下記）は内水氾濫を評価しない（タイルへのリクエスト自体を行わない）。 */
+  inundationTileUrl: string | null;
   onClose: () => void;
   /** ルート一覧が変化するたびに呼ばれる。地図への描画はMapView側で行う。
-   *  riskSegmentsは選択中ルートの区間別リスク評価(DEM＋洪水＋内水氾濫)。
+   *  riskSegmentsは選択中ルートの区間別リスク評価(DEM＋洪水、地域によっては内水氾濫も)。
    *  未評価/評価中/取得失敗の場合はnull(地図側は従来の単色ルート表示のままにする)。 */
   onRoutesChange: (
     data: {
@@ -132,7 +137,7 @@ export default function EvacuationPanel({
   // 既存のビュー遷移ロジックには手を加えない(詳細モーダルは重ねて開くだけ)。
   const [detailShelter, setDetailShelter] = useState<FloodShelterCandidate | null>(null);
 
-  // DEM標高＋洪水・内水氾濫による区間別リスク評価(routeDetailを開いた時だけ実行)。
+  // DEM標高＋洪水による区間別リスク評価(routeDetailを開いた時だけ実行)。
   // 【重要】既存のルート取得・ハザード評価(routeResults)には一切影響しない
   // 付加情報。失敗してもルート表示自体は壊さない。
   const [segmentRisk, setSegmentRisk] = useState<RouteRiskSegment[] | null>(null);
@@ -254,7 +259,8 @@ export default function EvacuationPanel({
     }
     setView("routeDetail");
 
-    // DEM標高＋洪水・内水氾濫による区間別リスク評価(このルートを見ている間だけ)。
+    // DEM標高＋洪水（内水氾濫データが確認できる地域では内水氾濫も）による
+    // 区間別リスク評価(このルートを見ている間だけ)。
     // 【重要】既存のroutingLoading/hazardEvalLoading/routeResultsとは独立した
     // 付加評価。失敗してもroutesError/routeResultsには一切触れない。
     setExpandedSegmentIndex(null);
@@ -263,7 +269,7 @@ export default function EvacuationPanel({
     if (!r) return;
     const requestId = ++segmentRiskRequestIdRef.current;
     setSegmentRiskLoading(true);
-    evaluateRouteSegmentRisk(r.route.geometry)
+    evaluateRouteSegmentRisk(r.route.geometry, { inundationTileUrl })
       .then((result) => {
         if (segmentRiskRequestIdRef.current !== requestId) return; // 古いrequestは無視(ルート切り替え済み)
         setSegmentRisk(result.segments);
@@ -495,9 +501,12 @@ export default function EvacuationPanel({
             </p>
           </section>
           <section>
-            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">区間別の参考評価（標高・洪水・内水氾濫）</h3>
+            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
+              区間別の参考評価（標高・洪水{inundationTileUrl ? "・内水氾濫" : ""}）
+            </h3>
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
-              標高・洪水・内水氾濫の情報をもとにした、このアプリ独自の参考評価です。実際の道路状況や浸水状況を保証するものではありません。国土地理院・大阪市等のデータを、このアプリが独自に組み合わせて評価したものであり、国や自治体がこの区間を危険と判定しているわけではありません。
+              標高・洪水{inundationTileUrl ? "・内水氾濫" : ""}
+              の情報をもとにした、このアプリ独自の参考評価です。実際の道路状況や浸水状況を保証するものではありません。国土地理院・大阪市等のデータを、このアプリが独自に組み合わせて評価したものであり、国や自治体がこの区間を危険と判定しているわけではありません。
             </p>
 
             {segmentRiskLoading && (
@@ -566,7 +575,8 @@ export default function EvacuationPanel({
             <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
               大阪市の洪水対応指定：あり（国土地理院データ）
               <br />
-              使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域・内水氾濫浸水想定区域）
+              使用ハザードデータ：ハザードマップポータルサイト（洪水浸水想定区域
+              {inundationTileUrl ? "・内水氾濫浸水想定区域" : ""}）
               <br />
               使用標高データ：国土地理院 標高タイル（基盤地図情報数値標高モデル）を加工して作成。標高は測量時点のものであり、現在の状況を示すリアルタイムデータではありません。
               <br />
