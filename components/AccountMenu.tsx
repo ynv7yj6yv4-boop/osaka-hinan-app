@@ -1,24 +1,29 @@
 "use client";
 
-// Phase 7: アカウントメニュー。地図の表示面積を狭めないよう、ヘッダー内の
-// 小さなアイコンボタンだけを常時表示し、押したときだけ既存のModal（スマートフォン
-// ではBottom Sheet表示）で登録メールアドレスとログアウトを出す。
+// Phase 7: アカウント情報（登録メールアドレス）とログアウト。
+// 以前はヘッダーの単独アイコンからModalで開いていたが、ハンバーガーメニュー
+// （components/AppMenu.tsx）の「アカウント」画面の中に組み込む形に変更した。
+// Clerkのユーザー情報を扱う部分はこのファイルだけに閉じ込め、端末内の保存を
+// 一切行わない（lib/auth/routeAccess.test.tsがこのファイルを検査している）。
 // メールアドレスはClerkのユーザー情報から表示するだけで、アプリ側では保存しない。
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { AUTH_LOADING_TIMEOUT_MS } from "@/lib/auth/authConfig";
-import Modal from "./ui/Modal";
 import Button from "./ui/Button";
-import { AccountIcon } from "./ui/icons";
 
-/**
- * variant:
- * - "header"（既定）: 縦向きのヘッダー内に、情報アイコンと同じ大きさで並べる
- * - "floating": 横向き（ヘッダー非表示）のとき、地図の上に単独で浮かせる丸いボタン
- */
-export default function AccountMenu({ variant = "header" }: { variant?: "header" | "floating" }) {
-  const [open, setOpen] = useState(false);
+export function AccountInfoItem({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="py-2.5">
+      <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
+      <dd className="mt-0.5 break-all text-base font-bold text-[var(--color-text-primary)]">{value}</dd>
+      {note && <dd className="mt-0.5 text-xs leading-snug text-[var(--color-text-muted)]">{note}</dd>}
+    </div>
+  );
+}
+
+/** ログイン情報の表示とログアウトボタン。childrenはその間に表示する（端末の利用状況等）。 */
+export default function AccountDetails({ children }: { children?: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
@@ -27,16 +32,18 @@ export default function AccountMenu({ variant = "header" }: { variant?: "header"
   // 「読み込み中」のままにしないよう、一定時間で「取得できませんでした」へ切り替える。
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   useEffect(() => {
-    if (!open || user) return;
+    if (user) return;
     const timer = setTimeout(() => setLoadTimedOut(true), AUTH_LOADING_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [open, user]);
+  }, [user]);
+  const notAvailable = (isLoaded && !user) || loadTimedOut;
   const emailAddress = user?.primaryEmailAddress?.emailAddress;
   const emailText = emailAddress
     ? emailAddress
-    : (isLoaded && !user) || loadTimedOut
+    : notAvailable
       ? "アカウント情報を取得できませんでした"
       : "（読み込み中）";
+  const loginStateText = user ? "ログイン中（メールアドレス）" : notAvailable ? "確認できませんでした" : "（読み込み中）";
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -51,33 +58,20 @@ export default function AccountMenu({ variant = "header" }: { variant?: "header"
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-label="アカウントメニューを開く"
-        className={
-          variant === "floating"
-            ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/95 text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)]"
-            : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)]"
-        }
-      >
-        <AccountIcon className={variant === "floating" ? "h-6 w-6" : "h-5 w-5"} />
-      </button>
-      {open && (
-        <Modal title="アカウント" onClose={() => setOpen(false)}>
-          <p className="text-xs text-[var(--color-text-muted)]">登録メールアドレス</p>
-          <p className="mt-0.5 break-all text-base font-bold text-[var(--color-text-primary)]">
-            {emailText}
-          </p>
-          <div role="alert" aria-live="assertive">
-            {error && <p className="mt-3 text-sm text-[var(--color-danger)]">{error}</p>}
-          </div>
-          <Button variant="danger-outline" fullWidth className="mt-5" onClick={handleSignOut} disabled={signingOut}>
-            {signingOut ? "ログアウトしています…" : "ログアウト"}
-          </Button>
-        </Modal>
-      )}
+      <section>
+        <h3 className="text-sm font-bold text-[var(--color-text-secondary)]">ログイン情報</h3>
+        <dl className="divide-y divide-[var(--color-border)]">
+          <AccountInfoItem label="ログイン状態" value={loginStateText} />
+          <AccountInfoItem label="登録メールアドレス" value={emailText} />
+        </dl>
+      </section>
+      {children}
+      <div role="alert" aria-live="assertive">
+        {error && <p className="mt-3 text-sm text-[var(--color-danger)]">{error}</p>}
+      </div>
+      <Button variant="danger-outline" fullWidth className="mt-5" onClick={handleSignOut} disabled={signingOut}>
+        {signingOut ? "ログアウトしています…" : "ログアウト"}
+      </Button>
     </>
   );
 }

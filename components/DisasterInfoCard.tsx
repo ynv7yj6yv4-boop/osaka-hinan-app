@@ -38,9 +38,21 @@ import ExternalDisasterInfoCard from "./ExternalDisasterInfoCard";
 import Modal from "./ui/Modal";
 import { InfoIcon, ChevronDownIcon } from "./ui/icons";
 
-export default function DisasterInfoCard() {
+export default function DisasterInfoCard({
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  /** マイ避難スイッチの「公式情報を見る」等、外から開閉したい場合に指定する（省略時は従来どおり内部で管理）。 */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+} = {}) {
   const titleId = useId();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next);
+    else setUncontrolledOpen(next);
+  };
   const [river, setRiver] = useState<Awaited<ReturnType<typeof getRiverStatus>> | null>(null);
   const [shelter, setShelter] = useState<Awaited<ReturnType<typeof getShelterStatus>> | null>(null);
 

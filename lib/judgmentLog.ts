@@ -7,11 +7,15 @@
 
 import type { AssessmentCompleteness, RiskFactor, RiskLevel } from "./riskAssessment";
 import type { RainfallObservationResult } from "./rainfallObservation";
+import type { ForecastRainfallCategory, ForecastRainfallSummary } from "./forecastRainfallRisk";
 
 // 判定ルールを変更した場合はこの値を更新する。
 // Phase5A.3: 404等(unknown)をrank0に変換しない解釈に統一したため更新。
 // "static-only"は「降雨は判定に未統合、静的ハザードのみでlevelを決定している」ことを表す。
 export const RULE_VERSION = "phase5a3-static-only-v2";
+// 2026-11: 予想雨量（lib/forecastRainfallRisk.ts）を静的ハザードと組み合わせてlevelを決めた場合のルール。
+// 予想雨量を取得できず静的ハザードのみで判定した場合は、従来のRULE_VERSIONを記録する。
+export const FORECAST_RULE_VERSION = "static-plus-forecast-v1-provisional";
 
 export type JudgmentLog = {
   judgedAt: string; // 判定を行った時刻（ISO文字列）
@@ -40,6 +44,12 @@ export type JudgmentLog = {
     | {
         status: "not_attempted"; // 何らかの理由で降雨取得自体を行わなかった場合
       };
+  /** 2026-11: 今後の予想雨量。取得を試みなかった場合はnull。 */
+  forecastRainfall: {
+    summary: ForecastRainfallSummary;
+    category: ForecastRainfallCategory | null;
+    usedInJudgment: boolean;
+  } | null;
   ruleVersion: string;
   finalResult: {
     level: RiskLevel;
@@ -56,8 +66,10 @@ export function buildJudgmentLog(params: {
   rainfall: RainfallObservationResult | null;
   level: RiskLevel;
   reasons: string[];
+  forecastRainfall?: JudgmentLog["forecastRainfall"];
 }): JudgmentLog {
   const { position, staticFactors, staticScore, completeness, rainfall, level, reasons } = params;
+  const forecastRainfall = params.forecastRainfall ?? null;
 
   const rainfallLog: JudgmentLog["rainfall"] = !rainfall
     ? { status: "not_attempted" }
@@ -77,7 +89,8 @@ export function buildJudgmentLog(params: {
     position,
     staticHazard: { factors: staticFactors, score: staticScore, completeness },
     rainfall: rainfallLog,
-    ruleVersion: RULE_VERSION,
+    forecastRainfall,
+    ruleVersion: forecastRainfall?.usedInJudgment ? FORECAST_RULE_VERSION : RULE_VERSION,
     finalResult: { level, score: staticScore },
     reasons,
   };

@@ -52,13 +52,37 @@ export default function RiskDetailModal({
       }
     >
       <Notice tone="info" title="このリスク評価は自治体等の公式な避難指示ではありません">
-        静的なハザードマップ（洪水浸水想定区域）に基づく参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。
+        {result.levelBasis === "static_and_forecast"
+          ? "ハザードマップ（洪水浸水想定区域）と今後の予想雨量に基づく参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。"
+          : "静的なハザードマップ（洪水浸水想定区域）に基づく参考情報です。公式の避難情報は必ず自治体等の発表をご確認ください。"}
       </Notice>
 
       <section className="mt-4">
         <h3 className="text-base font-bold text-[var(--color-text-primary)]">次に確認するとよいこと</h3>
         <p className="mt-1 text-base leading-relaxed text-[var(--color-text-primary)]">{p.action}</p>
       </section>
+
+      {result.forecastRainfall && (
+        <section className="mt-4 rounded-[var(--radius-md)] border-2 border-[var(--color-border)] p-3.5">
+          <h3 className="text-base font-bold text-[var(--color-text-primary)]">
+            今後{result.forecastRainfall.status === "evaluated" ? result.forecastRainfall.windowHours : 24}時間の予想雨量
+          </h3>
+          {result.forecastRainfall.status === "evaluated" ? (
+            <>
+              <p className="mt-1 text-base text-[var(--color-text-primary)]">
+                合計 約{result.forecastRainfall.totalMm}mm（1時間あたり最大 約{result.forecastRainfall.maxHourlyMm}mm）
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                気象庁の数値予報モデル（MSM）による予想値です（Open-Meteo経由）。この予想雨量を、浸水想定区域と組み合わせて危険度を判定しています。
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              予想雨量を取得できなかったため、静的なハザード情報のみで危険度を判定しています。
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="mt-4 rounded-[var(--radius-md)] border-2 border-[var(--color-info-border)] bg-[var(--color-info-surface)] p-3.5">
         <h3 className="text-base font-bold text-[var(--color-text-primary)]">現在の降雨（参考情報）</h3>
@@ -75,12 +99,12 @@ export default function RiskDetailModal({
           </p>
         )}
         <p className="mt-2 text-xs font-bold text-[var(--color-info)]">
-          ※この降雨情報は、下記の「現在地の災害リスク」の判定にはまだ反映されていません。
+          ※この現在の降雨（レーダー実況）は、「現在地の災害リスク」の判定には反映していません。
         </p>
       </section>
 
       <section className="mt-4">
-        <h3 className="text-base font-bold text-[var(--color-text-primary)]">判定理由（静的なハザード情報）</h3>
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">判定理由</h3>
         <ul className="mt-2 space-y-1 text-base text-[var(--color-text-primary)]">
           {result.reasons.map((reason, i) => (
             <li key={i}>・{reason}</li>

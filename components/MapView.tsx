@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import ShelterLayer from "./ShelterLayer";
 import { HAZARD_BUTTONS, HAZARD_TILE_URL, HAZARD_ATTRIBUTION, type HazardKey } from "./hazardLayers";
 import CandidateMarkers from "./CandidateMarkers";
-import AccountMenu from "./AccountMenu";
+import { AppMenuButton, AppMenuDrawer } from "./AppMenu";
+import {
+  MyEvacuationSwitchStatusRow,
+  MyEvacuationSwitchDetailSheet,
+  type MyEvacuationSwitchStatusValue,
+} from "./MyEvacuationSwitchStatus";
 import RiskCard from "./RiskCard";
 import DisasterInfoCard from "./DisasterInfoCard";
 import RiskDetailModal from "./RiskDetailModal";
@@ -19,8 +24,15 @@ import HazardLayerControl from "./HazardLayerControl";
 import Button from "./ui/Button";
 import Notice from "./ui/Notice";
 import { LocationIcon, InfoIcon } from "./ui/icons";
-import { assessRisk, type RiskResult } from "@/lib/riskAssessment";
+import { assessRisk, type RiskLevel, type RiskResult } from "@/lib/riskAssessment";
 import { recordRiskHistoryEntry, type RecordRiskHistoryResult } from "@/lib/riskHistory";
+import {
+  becameOn,
+  loadMyEvacuationSwitchSettings,
+  recordMyEvacuationSwitchState,
+  saveMyEvacuationSwitchEnabled,
+} from "@/lib/myEvacuationSwitch";
+import { appMenuReducer, INITIAL_APP_MENU_STATE } from "@/lib/menu/appMenuState";
 import { checkRegion } from "@/lib/region/checkRegion";
 import { getRegionCapability } from "@/lib/region/capability";
 import type { RegionCheckResult, Region } from "@/lib/region/types";
@@ -149,6 +161,43 @@ export default function MapView() {
   // 地図上の避難所マーカーの吹き出しから「ルートを見る」を押したときの行き先。
   // nullのときは、避難先パネルを通常どおり候補一覧から開く。
   const [routeRequest, setRouteRequest] = useState<FloodShelterCandidate | null>(null);
+
+  // ハンバーガーメニュー（開閉・画面遷移はlib/menu/appMenuState.tsのreducer）。
+  const [menuState, dispatchMenu] = useReducer(appMenuReducer, INITIAL_APP_MENU_STATE);
+  // 災害関連情報シート。マイ避難スイッチの「公式情報を見る」からも開くためここで保持する。
+  const [showDisasterInfo, setShowDisasterInfo] = useState(false);
+
+  // マイ避難スイッチ（lib/myEvacuationSwitch.ts）。switchEnabledは「機能を使うか」の設定、
+  // switchStatusはリスク判定から決まる実際の状態（off/準備/ON/判定不能）で、両者は別物。
+  // 機能が無効の間はswitchStatusを作らず、表示・記録処理を一切行わない
+  // （既存のRiskCard・公式情報の表示には影響しない）。
+  const [switchEnabled, setSwitchEnabled] = useState(() => loadMyEvacuationSwitchSettings().featureEnabled);
+  const [switchSaveFailed, setSwitchSaveFailed] = useState(false);
+  const [switchStatus, setSwitchStatus] = useState<MyEvacuationSwitchStatusValue | null>(null);
+  const [showSwitchDetail, setShowSwitchDetail] = useState(false);
+  // 現在地取得（非同期）の完了時点の設定を参照するためのref。
+  const switchEnabledRef = useRef(switchEnabled);
+
+  const applySwitchState = (enabled: boolean, level: RiskLevel, openDetailIfBecameOn: boolean) => {
+    const recorded = recordMyEvacuationSwitchState(enabled, level, new Date().toISOString());
+    if (!recorded) {
+      setSwitchStatus(null);
+      return;
+    }
+    setSwitchStatus({ ...recorded, riskLevel: level });
+    // 平常時に決めた目安に達した瞬間だけ、詳細（行動導線）を自動で再提示する。
+    if (openDetailIfBecameOn && becameOn(recorded.transition)) setShowSwitchDetail(true);
+  };
+
+  const handleSwitchEnabledChange = (enabled: boolean) => {
+    const { saved } = saveMyEvacuationSwitchEnabled(enabled);
+    setSwitchSaveFailed(!saved);
+    setSwitchEnabled(enabled);
+    switchEnabledRef.current = enabled;
+    setShowSwitchDetail(false);
+    if (enabled && riskResult) applySwitchState(true, riskResult.level, false);
+    else setSwitchStatus(null);
+  };
 
   const openRouteTo = (destination: FloodShelterCandidate) => {
     setRouteRequest(destination);
@@ -292,6 +341,8 @@ export default function MapView() {
             // 記録する。サーバーへは送信せず、失敗してもリスク表示自体は壊れない
             // (lib/riskHistory.ts参照)。
             setRiskComparison(recordRiskHistoryEntry(result.level, result.generatedAt));
+            // マイ避難スイッチ: 機能が有効な場合のみ状態を判定する（位置情報は保存しない）。
+            if (switchEnabledRef.current) applySwitchState(true, result.level, true);
           })
           .finally(() => setIsAssessingRisk(false));
       },
@@ -450,13 +501,13 @@ export default function MapView() {
       ) : (
         <>
       {/* Phase 7: 横向き（パソコンのブラウザを含む）ではヘッダーを非表示にしているため、
-          アカウントメニュー（ログアウト）の入口を地図の右上に小さく浮かせて表示する。
+          メニュー（アカウント・ログアウト等を含む）の入口を地図の右上に小さく浮かせて表示する。
           縦向きではヘッダー内のアイコンを使うので、こちらは表示しない。 */}
       <div
         className="pointer-events-auto absolute z-[1000] hidden [@media(orientation:landscape)]:block"
         style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
       >
-        <AccountMenu variant="floating" />
+        <AppMenuButton variant="floating" expanded={menuState.open} onOpen={() => dispatchMenu({ type: "open" })} />
       </div>
 
       {/* ==== 前面レイヤー：地図の上に重ねる情報 ====
@@ -507,8 +558,8 @@ export default function MapView() {
                   参考情報・{APP_TARGET_AREA_LABEL}
                 </p>
               </div>
-              {/* Phase 7: アカウントメニュー（ログアウト等）。情報アイコンと同じ大きさの
-                  アイコンを並べるだけにし、ヘッダーの高さ・地図の表示面積は変えない。 */}
+              {/* ハンバーガーメニュー（アカウント・マイ避難スイッチ・通知設定等）。以前の
+                  アカウントアイコンの位置に置き換え、ヘッダーの高さ・地図の表示面積は変えない。 */}
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
@@ -520,7 +571,7 @@ export default function MapView() {
                 >
                   <InfoIcon className="h-5 w-5" />
                 </button>
-                <AccountMenu />
+                <AppMenuButton expanded={menuState.open} onOpen={() => dispatchMenu({ type: "open" })} />
               </div>
             </div>
             {showAreaInfo && (
@@ -602,10 +653,18 @@ export default function MapView() {
             />
           </div>
 
+          {/* マイ避難スイッチ（機能が有効で、リスク判定済みの場合のみ）。RiskCardを
+              大きくしないよう、直下に1行のボタンだけを置く。 */}
+          {switchEnabled && switchStatus && !isAssessingRisk && (
+            <div className="pointer-events-auto">
+              <MyEvacuationSwitchStatusRow status={switchStatus} onOpen={() => setShowSwitchDetail(true)} />
+            </div>
+          )}
+
           {/* 河川・道路・避難所の公式情報リンク（リアルタイム自動取得は未対応）。
               既存のRiskCard・判定ロジック・避難所データには一切触れていない。 */}
           <div className="pointer-events-auto">
-            <DisasterInfoCard />
+            <DisasterInfoCard open={showDisasterInfo} onOpenChange={setShowDisasterInfo} />
           </div>
         </div>
 
@@ -693,6 +752,48 @@ export default function MapView() {
         </div>
       </div>
         </>
+      )}
+
+      <AppMenuDrawer
+        state={menuState}
+        dispatch={dispatchMenu}
+        position={position}
+        switchEnabled={switchEnabled}
+        onSwitchEnabledChange={handleSwitchEnabledChange}
+        switchStatus={switchStatus}
+        switchSaveFailed={switchSaveFailed}
+      />
+
+      {/* ON時の行動導線は、既存の避難先パネル・ルート表示・災害関連情報シートをそのまま開く
+          （新しいルート取得ロジックは持たない）。ナビ中は表示しない。 */}
+      {showSwitchDetail && switchEnabled && switchStatus && !navigationSession && (
+        <MyEvacuationSwitchDetailSheet
+          status={switchStatus}
+          onClose={() => setShowSwitchDetail(false)}
+          hasRoute={evacuationRoutes !== null}
+          onShowShelters={() => {
+            setShowSwitchDetail(false);
+            setRouteRequest(null);
+            setShowEvacuationPanel(true);
+          }}
+          onShowRoute={() => {
+            setShowSwitchDetail(false);
+            if (evacuationRoutes) {
+              openRouteTo(evacuationRoutes.destination);
+            } else {
+              setRouteRequest(null);
+              setShowEvacuationPanel(true);
+            }
+          }}
+          onShowOfficialInfo={() => {
+            setShowSwitchDetail(false);
+            setShowDisasterInfo(true);
+          }}
+          onOpenSettings={() => {
+            setShowSwitchDetail(false);
+            dispatchMenu({ type: "open", view: "myEvacuationSwitch" });
+          }}
+        />
       )}
 
       {showRiskDetail && riskResult && (
