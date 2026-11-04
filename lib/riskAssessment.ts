@@ -10,6 +10,11 @@
 //   inundationTileUrlを渡された場合だけ内水氾濫も評価する仕組み自体は残している。
 //   高潮のタイルURL・判定関数自体は components/hazardLayers.ts に残している
 //   （完全削除はしない。将来的な再対応や他機能からの参照に備える）。
+// - 【2026-11 変更】今後24時間の予想雨量（lib/forecastRainfallRisk.ts、JMA MSM）を
+//   静的ハザードと組み合わせてlevelを決めるようにした（浸水想定区域内でも、雨が
+//   予想されていなければ「高リスク」にしない）。予想雨量を取得できない場合は従来どおり
+//   静的ハザードのみで判定する（levelBasis="static_only"）。降雨実況(レーダー)は引き続き
+//   表示のみで、判定には使わない。
 // - リアルタイムの降雨・河川水位・気象警報は「まだ使えないデータ」として明示し、
 //   将来のPhaseで追加できるよう、判定要素(RiskFactor)を配列で拡張できる構造にしている
 // - 現時点ではリアルタイム情報が無いため、🔴（最高リスク）は使用せず🟠までに抑える
@@ -28,6 +33,14 @@ import type { DepthRank } from "./hazardColorLegend.ts";
 import { fetchElevation, type ElevationResult } from "./elevation.ts";
 import { fetchRainfallObservation, type RainfallObservationResult } from "./rainfallObservation.ts";
 import { buildJudgmentLog, type JudgmentLog } from "./judgmentLog.ts";
+import {
+  FORECAST_RAINFALL_RISK_CONFIG,
+  categorizeForecastRainfall,
+  combineStaticAndForecast,
+  fetchForecastRainfallSummary,
+  type ForecastRainfallCategory,
+  type ForecastRainfallSummary,
+} from "./forecastRainfallRisk.ts";
 
 export type RiskLevel = "unknown" | "safe" | "caution" | "prepare" | "evacuate";
 
@@ -89,6 +102,14 @@ export type RiskResult = {
   // 重要: staticRisk（上記level/score/factors/reasons）は降雨の影響を受けない。
   // 「静的には高リスクだが今は降っていない」等を区別できるよう、常に別枠で保持する。
   rainfall: RainfallObservationResult;
+  // 2026-11: 今後の予想雨量（lib/forecastRainfallRisk.ts）。取得を試みなかった場合はnull。
+  forecastRainfall: ForecastRainfallSummary | null;
+  /**
+   * levelをどの情報から決めたか。
+   * - "static_and_forecast": 静的ハザード＋予想雨量
+   * - "static_only": 予想雨量を取得できなかった（または取得しなかった）ため、静的ハザードのみ
+   */
+  levelBasis: "static_and_forecast" | "static_only";
   judgmentLog: JudgmentLog;
 };
 
@@ -156,6 +177,32 @@ const RECOMMENDATION_TEXT: Record<RiskLevel, string> = {
   evacuate: "この場所は特に深刻な浸水が想定されています。災害発生時は速やかな避難を検討してください。",
 };
 
+const FORECAST_CATEGORY_TEXT: Record<ForecastRainfallCategory, string> = {
+  low: "大雨は予想されていません",
+  moderate: "まとまった雨が予想されています",
+  heavy: "大雨が予想されています",
+};
+
+// 予想雨量を加味した場合の推奨行動。静的ハザードだけの文言（RECOMMENDATION_TEXT）だと、
+// 「区域内だが雨は予想されていない」等の状況を正しく説明できないため、組み合わせごとに用意する。
+// 公式の避難指示と誤認される断定表現は使わない。
+function forecastRecommendation(staticRank: number, category: ForecastRainfallCategory, windowHours: number): string {
+  const when = `今後${windowHours}時間に`;
+  if (staticRank <= 0) {
+    if (category === "low")
+      return `この場所は洪水浸水想定区域外で、${when}大雨は予想されていません。念のため、今後の気象情報にも注意しておきましょう。`;
+    if (category === "moderate")
+      return `この場所は洪水浸水想定区域外です。${when}まとまった雨が予想されているため、最新の気象情報に注意しておきましょう。`;
+    return `この場所は洪水浸水想定区域外ですが、${when}大雨が予想されています。最新の気象情報や市区町村の情報に注意してください。`;
+  }
+  const level = combineStaticAndForecast(staticRank, category);
+  if (level === "prepare")
+    return `この場所は洪水浸水想定区域内で、${when}${category === "heavy" ? "大雨" : "まとまった雨"}が予想されています。市区町村等の公式避難情報を確認し、早めの避難を検討してください。`;
+  if (category === "low")
+    return `この場所は洪水浸水想定区域内ですが、${when}大雨は予想されていません。雨が強まる前に、避難場所や避難経路を確認しておきましょう。`;
+  return `この場所は洪水浸水想定区域内で、${when}まとまった雨が予想されています。最新の気象情報に注意し、避難場所や避難経路を確認しておきましょう。`;
+}
+
 // 常に評価する基本ハザード。内水氾濫は現行の対象外のため含めない
 // （将来の再導入時はassessRisk()のinundationTileUrl引数で追加される）。
 const BASE_HAZARD_KEYS: HazardKey[] = ["flood"];
@@ -188,8 +235,15 @@ export function buildRiskResult(params: {
    * （lib/region/inlandFloodAvailability.ts参照）。
    */
   hazardKeys?: HazardKey[];
+  /**
+   * 2026-11: 今後の予想雨量。渡された場合（status="evaluated"）のみ、静的ハザードと
+   * 組み合わせてlevelを決める。省略時・取得失敗時は従来どおり静的ハザードのみで判定する
+   * （取得失敗でレベルを引き下げない安全側の方針）。
+   */
+  forecastRainfall?: ForecastRainfallSummary | null;
 }): RiskResult {
   const { lat, lng, elevation, rainfall } = params;
+  const forecastRainfall = params.forecastRainfall ?? null;
   const hazardKeys = params.hazardKeys ?? BASE_HAZARD_KEYS;
   const hazardResults = params.hazardPixels.map(toHazardAssessment);
 
@@ -259,17 +313,59 @@ export function buildRiskResult(params: {
     score: 0,
   });
 
-  const disclaimers = [
-    "これはハザードマップ等の静的な情報に基づくアプリ独自の参考評価であり、公式の避難情報ではありません。",
-    "大雨が実際に発生した場合を想定したハザードマップに基づく評価です。現在の降雨状況（表示している場合も含む）は、この危険度の判定には反映していません。",
-  ];
+  // 2026-11: 今後の予想雨量。静的ハザードを判定できなかった(unknown)場合は、
+  // 雨量だけでlevelを決めない（unknown != safe の方針を維持し、unknownのままにする）。
+  const forecastCategory =
+    forecastRainfall?.status === "evaluated" ? categorizeForecastRainfall(forecastRainfall) : null;
+  const levelBasis: RiskResult["levelBasis"] =
+    forecastCategory !== null && assessmentCompleteness !== "unavailable" ? "static_and_forecast" : "static_only";
+
+  if (forecastRainfall) {
+    const windowHours = forecastRainfall.status === "evaluated" ? forecastRainfall.windowHours : FORECAST_RAINFALL_RISK_CONFIG.windowHours;
+    const detail =
+      forecastRainfall.status === "evaluated" && forecastCategory
+        ? `今後${windowHours}時間の予想雨量：約${forecastRainfall.totalMm}mm（1時間あたり最大約${forecastRainfall.maxHourlyMm}mm）・${FORECAST_CATEGORY_TEXT[forecastCategory]}`
+        : "今後の予想雨量を取得できなかったため、静的なハザード情報のみで判定しています";
+    factors.push({
+      key: "forecast_rainfall",
+      label: "予想雨量",
+      available: forecastRainfall.status === "evaluated",
+      detail,
+      score: 0,
+    });
+    reasons.push(detail);
+  }
+
+  const disclaimers =
+    levelBasis === "static_and_forecast"
+      ? [
+          "これはハザードマップと予想雨量に基づくアプリ独自の参考評価であり、公式の避難情報ではありません。",
+          "予想雨量は気象庁の数値予報モデル（MSM、約5km四方）の値で、実際の雨量とは異なる場合があります。また、その雨量でこの場所が実際に浸水するかを予測するものではありません。",
+          "現在の降雨（レーダー実況）は、この危険度の判定には反映していません。",
+        ]
+      : [
+          "これはハザードマップ等の静的な情報に基づくアプリ独自の参考評価であり、公式の避難情報ではありません。",
+          "大雨が実際に発生した場合を想定したハザードマップに基づく評価です。現在の降雨状況（表示している場合も含む）は、この危険度の判定には反映していません。",
+        ];
+  if (forecastRainfall?.status === "unavailable") {
+    disclaimers.push("今後の予想雨量を取得できなかったため、静的なハザード情報のみで判定しています。");
+  }
   if (assessmentCompleteness === "partial") {
     disclaimers.push(
       "一部のハザードについて、情報を確認できませんでした。表示している危険度は、確認できた情報のみに基づいています。"
     );
   }
 
-  const level: RiskLevel = assessmentCompleteness === "unavailable" ? "unknown" : scoreToLevel(maxRank);
+  const level: RiskLevel =
+    assessmentCompleteness === "unavailable"
+      ? "unknown"
+      : levelBasis === "static_and_forecast" && forecastCategory
+        ? combineStaticAndForecast(maxRank, forecastCategory)
+        : scoreToLevel(maxRank);
+  const recommendation =
+    levelBasis === "static_and_forecast" && forecastCategory && forecastRainfall?.status === "evaluated"
+      ? forecastRecommendation(maxRank, forecastCategory, forecastRainfall.windowHours)
+      : RECOMMENDATION_TEXT[level];
 
   const judgmentLog = buildJudgmentLog({
     position: { lat, lng },
@@ -279,6 +375,10 @@ export function buildRiskResult(params: {
     rainfall,
     level,
     reasons,
+    forecastRainfall:
+      forecastRainfall === null
+        ? null
+        : { summary: forecastRainfall, category: forecastCategory, usedInJudgment: levelBasis === "static_and_forecast" },
   });
 
   return {
@@ -286,12 +386,14 @@ export function buildRiskResult(params: {
     score: maxRank,
     factors,
     reasons,
-    recommendation: RECOMMENDATION_TEXT[level],
+    recommendation,
     disclaimers,
     position: { lat, lng },
     generatedAt: params.generatedAt ?? new Date().toISOString(),
     assessmentCompleteness,
     rainfall,
+    forecastRainfall,
+    levelBasis,
     judgmentLog,
   };
 }
@@ -312,11 +414,14 @@ export async function assessRisk(
 
   // 静的ハザード判定・標高・降雨実況は互いに独立しているため並行取得する。
   // 降雨の取得に失敗しても、静的ハザード判定（Phase3の評価）には一切影響しない。
-  const [hazardPixels, elevation, rainfall] = await Promise.all([
+  // 2026-11: 予想雨量も並行取得する。取得に失敗してもunavailableが返るだけで、
+  // 静的ハザード判定には影響しない（その場合は静的ハザードのみで判定する）。
+  const [hazardPixels, elevation, rainfall, forecastRainfall] = await Promise.all([
     Promise.all(hazardUrls.map((url) => classifyHazardPixel(url, lat, lng))),
     fetchElevation(lat, lng),
     fetchRainfallObservation(lat, lng),
+    fetchForecastRainfallSummary(lat, lng),
   ]);
 
-  return buildRiskResult({ lat, lng, hazardPixels, elevation, rainfall, hazardKeys });
+  return buildRiskResult({ lat, lng, hazardPixels, elevation, rainfall, hazardKeys, forecastRainfall });
 }

@@ -40,7 +40,7 @@ export const RISK_PRESENTATION: Record<RiskLevel, RiskPresentation> = {
   safe: {
     icon: SuccessIcon,
     label: "低リスク",
-    summary: "現在、静的なハザード情報では低いリスクと判定されています。",
+    summary: "浸水想定や予想雨量から、現在は低いリスクと判定されています。",
     action: "念のため、公式の気象・避難情報も定期的にご確認ください。",
     fg: "var(--color-risk-safe)",
     surface: "var(--color-risk-safe-surface)",
@@ -49,7 +49,7 @@ export const RISK_PRESENTATION: Record<RiskLevel, RiskPresentation> = {
   caution: {
     icon: WarningIcon,
     label: "注意",
-    summary: "静的なハザード情報から、注意が必要な区域の可能性があります。",
+    summary: "浸水想定や予想雨量から、注意が必要な状況の可能性があります。",
     action: "周辺のハザード情報を確認し、最新の気象情報にご注意ください。",
     fg: "var(--color-risk-caution)",
     surface: "var(--color-risk-caution-surface)",
@@ -58,7 +58,7 @@ export const RISK_PRESENTATION: Record<RiskLevel, RiskPresentation> = {
   prepare: {
     icon: WarningIcon,
     label: "高リスク",
-    summary: "静的なハザード情報から、高いリスクが想定される区域の可能性があります。",
+    summary: "浸水想定や予想雨量から、高いリスクが想定される状況の可能性があります。",
     action: "避難先・避難ルートの確認など、事前の準備を検討してください。",
     fg: "var(--color-risk-prepare)",
     surface: "var(--color-risk-prepare-surface)",
@@ -67,7 +67,7 @@ export const RISK_PRESENTATION: Record<RiskLevel, RiskPresentation> = {
   evacuate: {
     icon: DangerIcon,
     label: "最高リスク",
-    summary: "静的なハザード情報から、最も高いリスクが想定される区域の可能性があります。",
+    summary: "浸水想定や予想雨量から、最も高いリスクが想定される状況の可能性があります。",
     action: "自治体等が発令する公式の避難情報を必ずご確認のうえ、行動してください。",
     fg: "var(--color-risk-evacuate)",
     surface: "var(--color-risk-evacuate-surface)",

@@ -98,6 +98,13 @@ export default function RiskCard({
           <span className="block text-xs font-medium text-[var(--color-text-secondary)]">現在地の災害リスク（参考評価）</span>
           <span className="mt-1 block text-sm leading-snug text-[var(--color-text-primary)]">{p.summary}</span>
           <span className="mt-2 block text-xs leading-snug text-[var(--color-text-secondary)]">{targetHazardText(result)}</span>
+          {result.forecastRainfall && (
+            <span className="mt-1 block text-xs leading-snug text-[var(--color-text-secondary)]">
+              {result.forecastRainfall.status === "evaluated"
+                ? `今後${result.forecastRainfall.windowHours}時間の予想雨量：約${result.forecastRainfall.totalMm}mm（1時間あたり最大 約${result.forecastRainfall.maxHourlyMm}mm）`
+                : "予想雨量を取得できなかったため、浸水想定のみで判定しています"}
+            </span>
+          )}
           {comparison && (
             <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug">
               <span className="flex items-center gap-1 font-bold" style={{ color: RISK_COMPARISON_TONE_COLOR[describeRiskComparison(comparison.comparison).tone] }}>
